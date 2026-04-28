@@ -1,0 +1,25 @@
+{
+  "full_name": "",
+  "gender": "",
+  "age": "",
+  "phone": "",
+  "email": "",
+  "wechat": "",
+  "location": "",
+  "education": [],
+  "graduation": "",
+  "target_role": "",
+  "summary": "",
+  "photo_path": "",
+  "modules": [
+    { "id": "summary", "name": "求职定位", "type": "builtin", "enabled": true },
+    { "id": "skills", "name": "核心能力", "type": "builtin", "enabled": true },
+    { "id": "experience", "name": "工作经历", "type": "builtin", "enabled": true },
+    { "id": "projects", "name": "项目经历", "type": "builtin", "enabled": true },
+    { "id": "education", "name": "教育背景", "type": "builtin", "enabled": true }
+  ],
+  "skills": [],
+  "experience": [],
+  "projects": [],
+  "custom_sections": []
+}

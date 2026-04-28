@@ -1,0 +1,122 @@
+{
+  "search_time": "2026-04-27T10:00:00",
+  "method": "search_engine",
+  "city": "上海",
+  "direction": "Java开发",
+  "total_urls": 5,
+  "deduped_urls": 4,
+  "summary": {
+    "human_readable": "本次搜索覆盖2个招聘站点，去重后4条，3条验证有效，近期职位2条。",
+    "best_opportunity": "民营名企初中级岗位最多，国企央企校招更值得优先看",
+    "risk_note": "部分 probably_valid 链接受反爬影响，打开前需人工确认"
+  },
+  "jobs": [
+    {
+      "url": "https://www.zhipin.com/job_detail/example1.html",
+      "title": "Java后端开发工程师（校招）",
+      "snippet": "上海｜应届｜Java｜SpringBoot｜MySQL｜近3天发布",
+      "source": "zhipin",
+      "direction": "Java开发",
+      "direction_confidence": 0.91,
+      "enterprise": "中国电信",
+      "enterprise_type": "国企央企",
+      "enterprise_type_confidence": 0.92,
+      "job_level": "校招/应届",
+      "job_level_confidence": 0.94,
+      "job_level_evidence": ["标题含 校招", "摘要含 应届"],
+      "freshness": "recent",
+      "freshness_evidence": "摘要含 近3天发布",
+      "validation_status": "valid",
+      "validation_evidence": "页面含职位标题和公司名",
+      "detected_at": "2026-04-27T10:00:00"
+    },
+    {
+      "url": "https://www.liepin.com/job/example2.html",
+      "title": "Java高级工程师",
+      "snippet": "上海｜3-5年｜Spring Cloud｜微服务｜分布式",
+      "source": "liepin",
+      "direction": "Java开发",
+      "direction_confidence": 0.88,
+      "enterprise": "蚂蚁集团",
+      "enterprise_type": "民营名企",
+      "enterprise_type_confidence": 0.95,
+      "job_level": "中级（3-5年）",
+      "job_level_confidence": 0.86,
+      "job_level_evidence": ["标题含 高级", "摘要含 3-5年"],
+      "freshness": "new",
+      "freshness_evidence": "摘要含 近1天发布",
+      "validation_status": "valid",
+      "validation_evidence": "页面含职位标题和公司名",
+      "detected_at": "2026-04-27T10:00:00"
+    },
+    {
+      "url": "https://www.zhipin.com/job_detail/example3.html",
+      "title": "Java开发实习生",
+      "snippet": "上海｜实习｜Java基础｜Spring｜MySQL",
+      "source": "zhipin",
+      "direction": "Java开发",
+      "direction_confidence": 0.85,
+      "enterprise": "拼多多",
+      "enterprise_type": "民营名企",
+      "enterprise_type_confidence": 0.93,
+      "job_level": "实习",
+      "job_level_confidence": 0.90,
+      "job_level_evidence": ["标题含 实习"],
+      "freshness": "recent",
+      "freshness_evidence": "摘要含 近5天发布",
+      "validation_status": "probably_valid",
+      "validation_evidence": "页面含职位标题但部分内容缺失",
+      "detected_at": "2026-04-27T10:00:00"
+    },
+    {
+      "url": "https://expired.example.com/job/example4.html",
+      "title": "Java研发工程师",
+      "snippet": "上海｜1-3年",
+      "source": "zhipin",
+      "direction": "Java开发",
+      "direction_confidence": 0.70,
+      "enterprise": "示例公司",
+      "enterprise_type": "民营/上市公司",
+      "enterprise_type_confidence": 0.50,
+      "job_level": "初级（1-3年）",
+      "job_level_confidence": 0.60,
+      "job_level_evidence": ["摘要含 1-3年"],
+      "freshness": "stale",
+      "freshness_evidence": "发布时间超过30天",
+      "validation_status": "expired",
+      "validation_evidence": "页面显示职位已过期",
+      "detected_at": "2026-04-27T10:00:00"
+    }
+  ],
+  "by_job_level": {
+    "校招/应届": 1,
+    "中级（3-5年）": 1,
+    "实习": 1,
+    "初级（1-3年）": 1
+  },
+  "by_enterprise_type": {
+    "国企央企": 1,
+    "民营名企": 2,
+    "民营/上市公司": 1
+  },
+  "freshness": {
+    "new": 1,
+    "recent": 2,
+    "stale": 1
+  },
+  "by_source": {
+    "zhipin": 3,
+    "liepin": 1
+  },
+  "validation": {
+    "total_extracted": 5,
+    "deduped": 4,
+    "valid": 2,
+    "probably_valid": 1,
+    "expired": 1,
+    "blocked": 0,
+    "dead": 0,
+    "unverified_low_priority": 0,
+    "valid_or_probably_valid_rate": "75%"
+  }
+}
