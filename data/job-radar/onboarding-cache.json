@@ -1,0 +1,39 @@
+{
+  "savedAt": "2026-04-28T13:59:16.995Z",
+  "raw": {
+    "candidate": {
+      "full_name": "",
+      "gender": "",
+      "age": "",
+      "email": "",
+      "phone": "",
+      "github": "",
+      "wechat": "",
+      "portfolio_url": "",
+      "summary": "",
+      "skills": "",
+      "education": [
+        {
+          "school": "",
+          "degree": "",
+          "major": "",
+          "start_date": "",
+          "end_date": "",
+          "gpa": "",
+          "description": ""
+        }
+      ],
+      "experience": [],
+      "projects": []
+    },
+    "target": {
+      "roles": "",
+      "cities": "全国",
+      "levels": "校招/应届, 初级",
+      "enterprise_types": "不限",
+      "positive_keywords": "",
+      "negative_keywords": "销售, 客服, 培训, 保险, 中介",
+      "companies": ""
+    }
+  }
+}

@@ -24,7 +24,8 @@ export const healthAPI = {
 
 export const onboardingAPI = {
   status: () => unwrap(axios.get(`${API_BASE}/onboarding`)),
-  save: (data) => unwrap(axios.post(`${API_BASE}/onboarding`, data))
+  save: (data) => unwrap(axios.post(`${API_BASE}/onboarding`, data)),
+  loadData: () => unwrap(axios.get(`${API_BASE}/onboarding`)).then(r => r.data?.form || null)
 }
 
 export const companiesAPI = {

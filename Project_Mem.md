@@ -1,7 +1,7 @@
 # Project_Mem.md — Career-Ops 项目交接文档
 
 > 生成日期：2026-04-28
-> 项目版本：v1.3.0
+> 项目版本：v1.3.1
 > 原始作者：Santiago Fernández de Valderrama (santifer.io)
 > 许可证：MIT
 
@@ -29,6 +29,7 @@ Career-Ops 是一个基于 AI 的求职自动化流水线系统，运行在 Clau
 - `config/profile.yml`：从 AI/LLMOps 岗位改为嵌入式/PLC 方向
 - `portals.yml`：从欧美 AI 公司搜索改为 BOSS 直聘/猎聘的中国嵌入式岗位搜索
 - `gui/server.mjs`：新增 Job Radar 功能（公司发现、岗位管理、简历生成、面试准备），并接入 DeepSeek/豆包 API
+- `gui/src/pages/Onboarding.jsx`：**重写首次使用向导**（详见 5.4 节）
 - `data/job-radar/`：新增整个数据目录用于 GUI 管理的岗位和简历数据
 - 面试准备逻辑：从通用英文模板改为支持中文领域路由
 
@@ -115,9 +116,10 @@ career-ops/
 
 ### 3.4 前端体验问题（中等）
 
-1. 面试准备题目少时页面可用，但题目增多后缺少分类、搜索、筛选
-2. 简历生成无风险提示，用户无法看到哪些内容是 AI 生成、需要确认
-3. localStorage 缓存面试准备，schema 变更后旧缓存缺字段不兼容
+1. ~~首次使用向导字段不全、表单为纯 textarea~~ → **已修复**：结构化表单 + 每卡独立保存
+2. 面试准备题目少时页面可用，但题目增多后缺少分类、搜索、筛选
+3. 简历生成无风险提示，用户无法看到哪些内容是 AI 生成、需要确认
+4. localStorage 缓存面试准备，schema 变更后旧缓存缺字段不兼容
 
 ---
 
@@ -190,9 +192,34 @@ career-ops/
 | `modes/_profile.md` | 保留原始英文模板（未包含个人信息） |
 | `data/job-radar/resume-profile.json` | 清空为空白结构 |
 
----
+### 5.4 首次使用向导（Onboarding）重写
 
-## 六、后续接手指南
+**修改文件：** `gui/src/pages/Onboarding.jsx`、`gui/server.mjs`、`gui/src/api/index.js`、`gui/src/styles/index.css`
+
+**字段变更：**
+
+| 操作 | 字段 |
+|------|------|
+| 新增 | 性别 (`gender`)、年龄 (`age`)、微信 (`wechat`) |
+| 删除 | LinkedIn、所在地 (`location`) |
+| 结构化 | 教育/工作/项目 从 textarea 改为对象数组（与 ResumeBuilder 一致） |
+
+**功能变更：**
+
+| 功能 | 说明 |
+|------|------|
+| **6 区块折叠** | 基本信息、教育背景、项目经历、工作/实习经历、技能关键词、求职目标，默认全部折叠，点击标题栏切换 |
+| **每卡独立保存** | 每个区块底部有保存按钮 + 页面底部"全部保存"按钮，点击即调用 POST `/api/onboarding` |
+| **表单缓存回填** | 后端保存时写入 `onboarding-cache.json`；前端加载时 GET 回填，刷新/切页面不丢失数据 |
+| **自定义日期选择器** | 替代原生 `<input type="month">`：年份范围 2000-2050，年/月独立 select，点击年份可折叠月份，统一 26px 高度对齐 |
+
+**后端改动：**
+- `normalizeOnboardingPayload()` — education/experience/projects 遍历结构化数组
+- `renderCvMarkdown()` — 按结构化字段生成格式化 Markdown
+- `saveOnboardingFiles()` — 同步写入 onboarding-cache.json + resume-profile.json 新增 gender/age/wechat
+- `loadOnboardingCache()` / `GET /api/onboarding` — 返回已缓存的原始表单 payload |
+
+---
 
 ### 6.1 快速启动
 

@@ -1644,17 +1644,40 @@ function normalizeOnboardingPayload(body = {}) {
   return {
     candidate: {
       full_name: firstText(candidate.full_name, candidate.name),
+      gender: firstText(candidate.gender),
+      age: firstText(candidate.age),
       email: firstText(candidate.email),
       phone: firstText(candidate.phone),
-      location: firstText(candidate.location),
       github: firstText(candidate.github),
-      linkedin: firstText(candidate.linkedin),
+      wechat: firstText(candidate.wechat),
       portfolio_url: firstText(candidate.portfolio_url),
       summary: firstText(candidate.summary),
       skills: listFromText(candidate.skills),
-      education: paragraphList(candidate.education),
-      experience: paragraphList(candidate.experience),
-      projects: paragraphList(candidate.projects)
+      education: Array.isArray(candidate.education) ? candidate.education.map(edu => ({
+        school: firstText(edu.school),
+        degree: firstText(edu.degree),
+        major: firstText(edu.major),
+        start_date: firstText(edu.start_date),
+        end_date: firstText(edu.end_date),
+        gpa: firstText(edu.gpa),
+        description: firstText(edu.description)
+      })) : [],
+      experience: Array.isArray(candidate.experience) ? candidate.experience.map(exp => ({
+        company: firstText(exp.company),
+        position: firstText(exp.position),
+        start_date: firstText(exp.start_date),
+        end_date: firstText(exp.end_date),
+        description: firstText(exp.description),
+        role: firstText(exp.role)
+      })) : [],
+      projects: Array.isArray(candidate.projects) ? candidate.projects.map(proj => ({
+        name: firstText(proj.name),
+        role: firstText(proj.role),
+        start_date: firstText(proj.start_date),
+        end_date: firstText(proj.end_date),
+        description: firstText(proj.description),
+        tech_stack: firstText(proj.tech_stack)
+      })) : []
     },
     target: {
       roles: listFromText(target.roles),
@@ -1671,13 +1694,39 @@ function normalizeOnboardingPayload(body = {}) {
 function renderCvMarkdown({ candidate, target }) {
   const roles = target.roles.length ? target.roles : target.positive_keywords
   const skills = candidate.skills.length ? candidate.skills : target.positive_keywords
+  const eduLines = (candidate.education || []).flatMap(edu => {
+    const parts = [edu.school, edu.degree, edu.major].filter(Boolean)
+    if (edu.start_date || edu.end_date) parts.push(`${edu.start_date || '?'} ~ ${edu.end_date === 'present' ? '至今' : (edu.end_date || '?')}`)
+    const line = `- ${parts.join(' | ')}`
+    const extra = []
+    if (edu.gpa) extra.push(`  - GPA: ${edu.gpa}`)
+    if (edu.description) extra.push(`  - ${edu.description}`)
+    return extra.length ? [line, ...extra] : [line]
+  })
+  const expLines = (candidate.experience || []).flatMap(exp => {
+    const dateStr = (exp.start_date || '?') + ' ~ ' + (exp.end_date === 'present' ? '至今' : (exp.end_date || '?'))
+    const line = `- ${exp.company} | ${exp.position} (${dateStr})`
+    const extra = []
+    if (exp.role) extra.push(`  - 分工: ${exp.role}`)
+    if (exp.description) { exp.description.split('\n').forEach(l => extra.push(`  - ${l}`)) }
+    return extra.length ? [line, ...extra] : [line]
+  })
+  const projLines = (candidate.projects || []).flatMap(proj => {
+    const dateStr = (proj.start_date || '?') + ' ~ ' + (proj.end_date === 'present' ? '至今' : (proj.end_date || '?'))
+    const techPart = proj.tech_stack ? ` [${proj.tech_stack}]` : ''
+    const rolePart = proj.role ? ` (${proj.role})` : ''
+    const line = `- **${proj.name}**${rolePart}${techPart} -- ${dateStr}`
+    const extra = proj.description ? proj.description.split('\n').map(l => `  - ${l}`) : []
+    return [line, ...extra]
+  })
   const lines = [
     `# CV -- ${candidate.full_name || 'Candidate'}`,
     '',
-    candidate.location ? `**Location:** ${candidate.location}` : '',
     candidate.email ? `**Email:** ${candidate.email}` : '',
     candidate.phone ? `**Phone:** ${candidate.phone}` : '',
-    candidate.linkedin ? `**LinkedIn:** ${candidate.linkedin}` : '',
+    candidate.gender ? `**Gender:** ${candidate.gender}` : '',
+    candidate.age ? `**Age:** ${candidate.age}` : '',
+    candidate.wechat ? `**WeChat:** ${candidate.wechat}` : '',
     candidate.portfolio_url ? `**Portfolio:** ${candidate.portfolio_url}` : '',
     candidate.github ? `**GitHub:** ${candidate.github}` : '',
     '',
@@ -1694,15 +1743,15 @@ function renderCvMarkdown({ candidate, target }) {
     '',
     '## Projects',
     '',
-    ...(candidate.projects.length ? candidate.projects.map(project => `- ${project}`) : ['- [项目名称] -- [项目描述、技术栈和结果]']),
+    ...(projLines.length ? projLines : ['- [项目名称] -- [项目描述、技术栈和结果]']),
     '',
     '## Work Experience',
     '',
-    ...(candidate.experience.length ? candidate.experience.map(item => `- ${item}`) : ['- [公司/岗位] -- [职责、成果和时间]']),
+    ...(expLines.length ? expLines : ['- [公司/岗位] -- [职责、成果和时间]']),
     '',
     '## Education',
     '',
-    ...(candidate.education.length ? candidate.education.map(item => `- ${item}`) : ['- [学校 / 专业 / 学历 / 时间]']),
+    ...(eduLines.length ? eduLines : ['- [学校 / 专业 / 学历 / 时间]']),
     ''
   ]
   return lines.filter(line => line !== '').join('\n') + '\n'
@@ -1714,8 +1763,9 @@ function renderProfileYaml({ candidate, target }) {
       full_name: candidate.full_name || '[你的姓名]',
       email: candidate.email || '[你的邮箱]',
       phone: candidate.phone || '[你的电话]',
-      location: candidate.location || '[你的地点]',
-      linkedin: candidate.linkedin || '',
+      gender: candidate.gender || '',
+      age: candidate.age || '',
+      wechat: candidate.wechat || '',
       portfolio_url: candidate.portfolio_url || '',
       github: candidate.github || ''
     },
@@ -1798,42 +1848,36 @@ function saveOnboardingFiles(body = {}) {
   saveResumeProfile({
     ...profile,
     full_name: data.candidate.full_name || profile.full_name,
+    gender: data.candidate.gender || profile.gender,
+    age: data.candidate.age || profile.age,
     phone: data.candidate.phone || profile.phone,
     email: data.candidate.email || profile.email,
-    location: data.candidate.location || profile.location,
+    wechat: data.candidate.wechat || profile.wechat,
     github: data.candidate.github || profile.github,
+    portfolio_url: data.candidate.portfolio_url || profile.portfolio_url,
     target_role: data.target.roles.join(' / ') || data.target.positive_keywords.join(' / ') || profile.target_role,
     summary: data.candidate.summary || profile.summary,
     skills: data.candidate.skills.join('、') || profile.skills,
-    education: data.candidate.education.length ? [{
-      school: data.candidate.education[0],
-      degree: '',
-      major: '',
-      start_date: '',
-      end_date: '',
-      gpa: '',
-      description: data.candidate.education.slice(1).join('\n')
-    }] : profile.education,
-    experience: data.candidate.experience.length ? data.candidate.experience.map(item => ({
-      company: '',
-      position: '',
-      start_date: '',
-      end_date: '',
-      description: item,
-      role: ''
-    })) : profile.experience,
-    projects: data.candidate.projects.length ? data.candidate.projects.map(item => ({
-      name: item.split(/：|:|--/)[0]?.trim() || '项目经历',
-      role: '',
-      start_date: '',
-      end_date: '',
-      tech_stack: data.candidate.skills.join('、'),
-      description: item
-    })) : profile.projects
+    education: data.candidate.education.length ? data.candidate.education : (profile.education || []),
+    experience: data.candidate.experience.length ? data.candidate.experience : (profile.experience || []),
+    projects: data.candidate.projects.length ? data.candidate.projects : (profile.projects || [])
   })
   written.push('data/job-radar/resume-profile.json')
 
+  const ONBOARDING_CACHE = `${PROJECT_ROOT}/data/job-radar/onboarding-cache.json`
+  writeFileSync(ONBOARDING_CACHE, JSON.stringify({ savedAt: new Date().toISOString(), raw: body }, null, 2), 'utf-8')
+  written.push('onboarding-cache.json')
+
   return { written }
+}
+
+function loadOnboardingCache() {
+  const ONBOARDING_CACHE = `${PROJECT_ROOT}/data/job-radar/onboarding-cache.json`
+  if (!existsSync(ONBOARDING_CACHE)) return null
+  try {
+    const raw = JSON.parse(readFileSync(ONBOARDING_CACHE, 'utf-8'))
+    return raw.raw
+  } catch { return null }
 }
 
 function escapeXml(value) {
@@ -3922,13 +3966,15 @@ function parseMultipartForm(data) {
 const routes = {
   '/api/onboarding': {
     GET: async () => {
+      const cache = loadOnboardingCache()
       return {
         success: true,
         data: {
           cv: existsSync(`${PROJECT_ROOT}/cv.md`),
           profile: existsSync(`${PROJECT_ROOT}/config/profile.yml`),
           portals: existsSync(PORTALS_FILE),
-          resume_profile: existsSync(RESUME_PROFILE_FILE)
+          resume_profile: existsSync(RESUME_PROFILE_FILE),
+          form: cache
         }
       }
     },

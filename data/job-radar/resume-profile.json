@@ -1,25 +1,69 @@
 {
-  "full_name": "",
-  "gender": "",
+  "full_name": "陈翔",
+  "gender": "男",
   "age": "",
-  "phone": "",
-  "email": "",
+  "phone": "19318201629",
+  "email": "m15111642499@163.com",
   "wechat": "",
   "location": "",
-  "education": [],
+  "education": [
+    {
+      "school": "",
+      "degree": "",
+      "major": "",
+      "start_date": "",
+      "end_date": "",
+      "gpa": "",
+      "description": ""
+    }
+  ],
   "graduation": "",
   "target_role": "",
   "summary": "",
   "photo_path": "",
   "modules": [
-    { "id": "summary", "name": "求职定位", "type": "builtin", "enabled": true },
-    { "id": "skills", "name": "核心能力", "type": "builtin", "enabled": true },
-    { "id": "experience", "name": "工作经历", "type": "builtin", "enabled": true },
-    { "id": "projects", "name": "项目经历", "type": "builtin", "enabled": true },
-    { "id": "education", "name": "教育背景", "type": "builtin", "enabled": true }
+    {
+      "id": "summary",
+      "name": "求职定位",
+      "type": "builtin",
+      "enabled": true
+    },
+    {
+      "id": "skills",
+      "name": "核心能力",
+      "type": "builtin",
+      "enabled": true
+    },
+    {
+      "id": "experience",
+      "name": "工作经历",
+      "type": "builtin",
+      "enabled": true
+    },
+    {
+      "id": "projects",
+      "name": "项目经历",
+      "type": "builtin",
+      "enabled": true
+    },
+    {
+      "id": "education",
+      "name": "教育背景",
+      "type": "builtin",
+      "enabled": true
+    }
   ],
   "skills": [],
   "experience": [],
-  "projects": [],
+  "projects": [
+    {
+      "name": "",
+      "role": "",
+      "start_date": "",
+      "end_date": "",
+      "description": "",
+      "tech_stack": ""
+    }
+  ],
   "custom_sections": []
 }

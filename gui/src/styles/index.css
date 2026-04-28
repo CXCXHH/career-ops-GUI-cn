@@ -733,6 +733,127 @@ input.form-input[type="month"] {
   gap: 12px;
 }
 
+.date-range-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 5px 8px;
+  transition: border-color 0.2s;
+  line-height: 1;
+}
+
+.date-range-picker:hover {
+  border-color: var(--accent-color, #3b82f6);
+}
+
+.date-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.date-field.folded .date-select-month {
+  display: none;
+}
+
+.date-year-wrap {
+  position: relative;
+  cursor: pointer;
+}
+
+.date-select {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0 6px;
+  height: 26px;
+  line-height: 26px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background 0.15s;
+  vertical-align: middle;
+}
+
+.date-select:hover {
+  background: rgba(0,0,0,0.05);
+}
+
+.date-select:focus {
+  outline: none;
+  background: rgba(59,130,246,0.08);
+}
+
+.date-select-year {
+  min-width: 52px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.date-select-month {
+  min-width: 38px;
+  text-align: center;
+}
+
+.date-select option {
+  font-weight: normal;
+}
+
+.date-arrow {
+  height: 26px;
+  line-height: 26px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  user-select: none;
+}
+
+.date-present {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  line-height: 1;
+  padding: 0 10px;
+  background: var(--accent-color, #3b82f6);
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.date-toggle-present {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  line-height: 1;
+  padding: 0 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.date-toggle-present:hover {
+  border-color: var(--accent-color, #3b82f6);
+  color: var(--accent-color, #3b82f6);
+}
+
+.date-toggle-present.active {
+  background: var(--accent-color, #3b82f6);
+  border-color: var(--accent-color, #3b82f6);
+  color: white;
+}
+
 .date-separator {
   font-size: 18px;
   color: var(--text-secondary);
@@ -1168,6 +1289,14 @@ input.form-input[type="month"] {
   border-radius: 8px;
   cursor: pointer;
   margin-bottom: 8px;
+}
+
+.section-header.clickable:hover {
+  background: var(--bg-hover, rgba(0,0,0,0.04));
+}
+
+.section-header.clickable:active {
+  transform: scale(0.995);
 }
 
 .section-header h3 {
