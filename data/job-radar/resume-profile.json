@@ -1,9 +1,9 @@
 {
-  "full_name": "陈翔",
-  "gender": "男",
+  "full_name": "",
+  "gender": "",
   "age": "",
-  "phone": "19318201629",
-  "email": "m15111642499@163.com",
+  "phone": "",
+  "email": "",
   "wechat": "",
   "location": "",
   "education": [
@@ -26,17 +26,17 @@
       "id": "summary",
       "name": "求职定位",
       "type": "builtin",
-      "enabled": true
-    },
-    {
-      "id": "skills",
-      "name": "核心能力",
-      "type": "builtin",
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "experience",
       "name": "工作经历",
+      "type": "builtin",
+      "enabled": false
+    },
+    {
+      "id": "skills",
+      "name": "核心能力",
       "type": "builtin",
       "enabled": true
     },

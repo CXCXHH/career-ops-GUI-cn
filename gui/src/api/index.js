@@ -68,10 +68,13 @@ export const aiAPI = {
 export const resumeAPI = {
   getProfile: () => unwrap(axios.get(`${API_BASE}/resume/profile`)),
   saveProfile: (data) => unwrap(axios.post(`${API_BASE}/resume/profile`, data)),
+  getFiles: () => unwrap(axios.get(`${API_BASE}/resume/files`)),
+  deletePhoto: () => unwrap(axios.delete(`${API_BASE}/resume/photo`)),
   getModules: () => unwrap(axios.get(`${API_BASE}/resume/modules`)),
   addModule: (data) => unwrap(axios.post(`${API_BASE}/resume/modules`, data)),
   updateModules: (modules) => unwrap(axios.put(`${API_BASE}/resume/modules`, modules)),
   updateModule: (id, data) => unwrap(axios.patch(`${API_BASE}/resume/modules/${id}`, data)),
+  saveModuleData: (id, data) => unwrap(axios.patch(`${API_BASE}/resume/modules/${id}/data`, data)),
   deleteModule: (id) => unwrap(axios.delete(`${API_BASE}/resume/modules/${id}`)),
   deleteFile: (path) => unwrap(axios.delete(`${API_BASE}/resume/delete-file`, { data: { path } }))
 }

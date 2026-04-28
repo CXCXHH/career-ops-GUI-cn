@@ -1204,6 +1204,159 @@ input.form-input[type="month"] {
   text-align: justify;
 }
 
+.preview-modal {
+  background: #f1f5f9;
+  border-radius: 12px;
+  width: min(920px, 100%);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+
+.preview-content {
+  overflow: auto;
+  padding: 20px;
+}
+
+.resume-preview-page {
+  width: 210mm;
+  min-height: 297mm;
+  max-width: 100%;
+  margin: 0 auto;
+  background: #fff;
+  color: #1e293b;
+  padding: 5mm 16mm;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+}
+
+.resume-preview-header {
+  display: grid;
+  grid-template-columns: 1fr 28mm;
+  gap: 12px;
+  align-items: start;
+  border-bottom: 2px solid #1178cc;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+}
+
+.resume-preview-header h1 {
+  margin: 0 0 4px;
+  font-size: 28px;
+  color: #1178cc;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.resume-preview-contact-grid {
+  color: #475569;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 0;
+  font-size: 12px;
+}
+
+.resume-preview-contact-grid span {
+  width: 50%;
+}
+
+.resume-preview-photo {
+  width: 25mm;
+  height: 32mm;
+  object-fit: cover;
+  border: 1px solid #1178cc;
+  justify-self: end;
+}
+
+.resume-preview-section {
+  margin-bottom: 12px;
+  break-inside: avoid;
+}
+
+.resume-preview-section-title {
+  color: #000;
+  font-weight: 700;
+  font-size: 14px;
+  text-align: center;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  white-space: nowrap;
+}
+
+.resume-preview-section-title .line {
+  flex: 1;
+  height: 0;
+  border-top: 1px solid #999;
+}
+
+.resume-preview-paragraph {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.resume-preview-skill-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+
+.resume-preview-skill-item {
+  font-size: 12px;
+  color: #1e293b;
+}
+
+.resume-preview-item {
+  margin-bottom: 10px;
+  break-inside: avoid;
+}
+
+.resume-preview-item-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-weight: 700;
+  color: #1178cc;
+  font-size: 12.5px;
+}
+
+.resume-preview-item-head-triplet span {
+  flex: 1;
+}
+
+.resume-preview-centered {
+  text-align: center;
+}
+
+.resume-preview-right {
+  text-align: right;
+}
+
+.resume-preview-muted {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.resume-preview-subline {
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.resume-preview-bullets {
+  margin: 5px 0 0 18px;
+  padding: 0;
+}
+
+.resume-preview-bullets li {
+  margin-bottom: 3px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 @media (max-width: 760px) {
   .resume-profile-grid {
     grid-template-columns: 1fr;
@@ -1219,6 +1372,38 @@ input.form-input[type="month"] {
   
   .action-buttons {
     grid-template-columns: 1fr;
+  }
+
+  .preview-content {
+    padding: 12px;
+  }
+
+  .resume-preview-page {
+    width: 100%;
+    min-height: auto;
+    padding: 16px;
+  }
+
+  .resume-preview-header {
+    grid-template-columns: 1fr;
+  }
+
+  .resume-preview-photo {
+    justify-self: start;
+  }
+
+  .resume-preview-contact-grid span {
+    width: 100%;
+  }
+
+  .resume-preview-item-head,
+  .resume-preview-item-head-triplet {
+    flex-direction: column;
+  }
+
+  .resume-preview-centered,
+  .resume-preview-right {
+    text-align: left;
   }
 }
 

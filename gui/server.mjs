@@ -1,5 +1,5 @@
 import { createServer } from 'http'
-import { readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync } from 'fs'
+import { readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync, unlinkSync, readdirSync, statSync } from 'fs'
 import { parse, stringify } from 'querystring'
 import { execFile } from 'child_process'
 import yaml from 'js-yaml'
@@ -41,6 +41,8 @@ function normalizeResumeModules(modules) {
   const source = Array.isArray(modules) ? modules : DEFAULT_RESUME_MODULES
   return source.filter(module => module?.id !== 'paper').map(module => ({ ...module }))
 }
+
+const BUILTIN_RESUME_DATA_MODULES = new Set(['education', 'experience', 'projects'])
 
 function loadDotEnv() {
   const envPath = `${PROJECT_ROOT}/.env`
@@ -1623,6 +1625,56 @@ function saveResumeProfile(profile) {
   return next
 }
 
+function deleteResumePhoto() {
+  const profile = getResumeProfile()
+  const photoPath = String(profile.photo_path || '').replace(/\\/g, '/')
+  if (photoPath.startsWith('data/job-radar/')) {
+    const fullPath = `${PROJECT_ROOT}/${photoPath}`
+    if (existsSync(fullPath)) {
+      unlinkSync(fullPath)
+    }
+  }
+  const next = {
+    ...profile,
+    photo_path: ''
+  }
+  writeFileSync(RESUME_PROFILE_FILE, JSON.stringify(next, null, 2), 'utf-8')
+  return next
+}
+
+function saveResumeModuleData(moduleId, payload = {}) {
+  if (!BUILTIN_RESUME_DATA_MODULES.has(moduleId)) {
+    throw new Error('Unsupported resume data module')
+  }
+
+  const current = getResumeProfile()
+  const next = { ...current }
+
+  if (moduleId === 'education') {
+    if (!Array.isArray(payload.education)) throw new Error('education must be an array')
+    next.education = payload.education
+  } else if (moduleId === 'experience') {
+    if (!Array.isArray(payload.experience)) throw new Error('experience must be an array')
+    next.experience = payload.experience
+  } else if (moduleId === 'projects') {
+    if (!Array.isArray(payload.projects)) throw new Error('projects must be an array')
+    next.projects = payload.projects
+  }
+
+  writeFileSync(RESUME_PROFILE_FILE, JSON.stringify(next, null, 2), 'utf-8')
+  return next
+}
+
+function getProjectDisplayName(project = {}) {
+  const name = String(project.name || '').trim()
+  if (name) return name
+  const role = String(project.role || '').trim()
+  if (role) return role
+  const stack = String(project.tech_stack || project.stack || '').trim()
+  if (stack) return stack.split(/[、,，|/]/).map(item => item.trim()).filter(Boolean).slice(0, 2).join(' / ')
+  return '项目经历'
+}
+
 function listFromText(value) {
   if (Array.isArray(value)) return value.map(String).map(v => v.trim()).filter(Boolean)
   return String(value || '')
@@ -1715,7 +1767,7 @@ function renderCvMarkdown({ candidate, target }) {
     const dateStr = (proj.start_date || '?') + ' ~ ' + (proj.end_date === 'present' ? '至今' : (proj.end_date || '?'))
     const techPart = proj.tech_stack ? ` [${proj.tech_stack}]` : ''
     const rolePart = proj.role ? ` (${proj.role})` : ''
-    const line = `- **${proj.name}**${rolePart}${techPart} -- ${dateStr}`
+    const line = `- **${getProjectDisplayName(proj)}**${rolePart}${techPart} -- ${dateStr}`
     const extra = proj.description ? proj.description.split('\n').map(l => `  - ${l}`) : []
     return [line, ...extra]
   })
@@ -2331,7 +2383,7 @@ async function adaptExistingProjectsWithAi(job, profile, projects, provider = 'd
 ${getJobText(job).slice(0, 1800)}
 
 候选人已有项目：
-${projects.map((p, i) => `${i + 1}. ${p.name || '未命名项目'}\n角色：${p.role || ''}\n时间：${p.start_date || ''} 至 ${p.end_date || ''}\n技术栈：${p.tech_stack || ''}\n描述：${p.description || ''}`).join('\n\n')}
+${projects.map((p, i) => `${i + 1}. ${getProjectDisplayName(p)}\n角色：${p.role || ''}\n时间：${p.start_date || ''} 至 ${p.end_date || ''}\n技术栈：${p.tech_stack || ''}\n描述：${p.description || ''}`).join('\n\n')}
 
 只输出 JSON：
 {
@@ -2400,7 +2452,7 @@ async function buildTailoredResume(job, profile, provider) {
     console.error('AI project adaptation failed, using original projects:', e.message)
   }
   const projects = profileProjects.map(p => ({
-    title: p.name || '未命名项目',
+    title: getProjectDisplayName(p),
     role: p.role || '',
     time: `${formatDateShort(p.start_date)} 至 ${formatDateShort(p.end_date) || '至今'}`,
     stack: p.tech_stack || '',
@@ -2741,8 +2793,43 @@ function cleanRoleForFileName(title) {
     .trim() || 'job'
 }
 
-function resumeFileName(job, profile, date, extension) {
-  return `cv-${safeSlug(profile.full_name || 'candidate', 'candidate')}-${safeSlug(job.company, 'company')}-${safeSlug(cleanRoleForFileName(job.title), 'job')}-${date}.${extension}`
+function resumeFileStem(job, profile, date) {
+  return `cv-${safeSlug(profile.full_name || 'candidate', 'candidate')}-${safeSlug(job.company, 'company')}-${safeSlug(cleanRoleForFileName(job.title), 'job')}-${date}`
+}
+
+function resolveUniqueResumeArtifactNames(stem, artifactSpecs) {
+  let suffix = 0
+
+  while (true) {
+    const candidateStem = suffix === 0 ? stem : `${stem}(${suffix})`
+    const taken = artifactSpecs.some(spec => existsSync(`${PROJECT_ROOT}/${spec.dir}/${candidateStem}.${spec.extension}`))
+    if (!taken) {
+      return artifactSpecs.reduce((acc, spec) => {
+        acc[spec.extension] = `${candidateStem}.${spec.extension}`
+        return acc
+      }, {})
+    }
+    suffix++
+  }
+}
+
+function listGeneratedResumeFiles() {
+  const dir = `${PROJECT_ROOT}/output`
+  if (!existsSync(dir)) return []
+  return readdirSync(dir)
+    .filter(name => /\.(pdf|docx)$/i.test(name))
+    .map(name => {
+      const fullPath = `${dir}/${name}`
+      const stat = statSync(fullPath)
+      return {
+        fileName: name,
+        name,
+        path: `output/${name}`,
+        updatedAt: stat.mtime.toISOString(),
+        size: stat.size
+      }
+    })
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
 }
 
 function crc32(buffer) {
@@ -2828,9 +2915,25 @@ function wText(text) {
   return `<w:r><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`
 }
 
+function wRun(text, options = {}) {
+  const props = []
+  if (options.bold) props.push('<w:b/>')
+  if (options.color) props.push(`<w:color w:val="${options.color}"/>`)
+  if (options.size) props.push(`<w:sz w:val="${options.size}"/>`)
+  if (options.font) props.push(`<w:rFonts w:ascii="${escapeXml(options.font)}" w:eastAsia="${escapeXml(options.font)}"/>`)
+  const rPr = props.length ? `<w:rPr>${props.join('')}</w:rPr>` : ''
+  return `<w:r>${rPr}<w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`
+}
+
 function wParagraph(text, style = '') {
   const props = style ? `<w:pPr><w:pStyle w:val="${style}"/></w:pPr>` : ''
   return `<w:p>${props}${wText(text)}</w:p>`
+}
+
+function wParagraphRuns(runs, style = '', extraPPr = '') {
+  const styleXml = style ? `<w:pStyle w:val="${style}"/>` : ''
+  const pPr = (styleXml || extraPPr) ? `<w:pPr>${styleXml}${extraPPr}</w:pPr>` : ''
+  return `<w:p>${pPr}${runs.join('')}</w:p>`
 }
 
 function wBullet(text) {
@@ -2848,19 +2951,90 @@ function wSectionTitle(text) {
   return `<w:p><w:pPr><w:pStyle w:val="SectionTitle"/></w:pPr>${wText(text)}</w:p>`
 }
 
-function buildDocxDocumentXml(resume) {
+function wTableCell(content, width, options = {}) {
+  const tcPr = [
+    width ? `<w:tcW w:w="${width}" w:type="dxa"/>` : '',
+    options.vAlign ? `<w:vAlign w:val="${options.vAlign}"/>` : '',
+    options.gridSpan ? `<w:gridSpan w:val="${options.gridSpan}"/>` : ''
+  ].filter(Boolean).join('')
+  return `<w:tc>${tcPr ? `<w:tcPr>${tcPr}</w:tcPr>` : ''}${content || '<w:p/>'}</w:tc>`
+}
+
+function wTableRow(cells) {
+  return `<w:tr>${cells.join('')}</w:tr>`
+}
+
+function wTable(rows, widths, options = {}) {
+  const borders = options.borders === 'none'
+    ? '<w:tblBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders>'
+    : options.borders === 'header'
+      ? '<w:tblBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="single" w:sz="12" w:space="6" w:color="1178CC"/><w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders>'
+      : ''
+  const layout = '<w:tblLayout w:type="fixed"/>'
+  const cellMar = '<w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:left w:w="40" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="40" w:type="dxa"/></w:tblCellMar>'
+  const tblPr = `<w:tblPr>${layout}${borders}${cellMar}</w:tblPr>`
+  const tblGrid = `<w:tblGrid>${(widths || []).map(width => `<w:gridCol w:w="${width}"/>`).join('')}</w:tblGrid>`
+  return `<w:tbl>${tblPr}${tblGrid}${rows.join('')}</w:tbl>`
+}
+
+function wDrawingImage(rId, cx, cy) {
+  return `<w:r>
+    <w:drawing>
+      <wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">
+        <wp:extent cx="${cx}" cy="${cy}"/>
+        <wp:effectExtent l="0" t="0" r="0" b="0"/>
+        <wp:docPr id="1" name="ResumePhoto"/>
+        <wp:cNvGraphicFramePr>
+          <a:graphicFrameLocks noChangeAspect="1" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"/>
+        </wp:cNvGraphicFramePr>
+        <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+            <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+              <pic:nvPicPr>
+                <pic:cNvPr id="0" name="ResumePhoto"/>
+                <pic:cNvPicPr/>
+              </pic:nvPicPr>
+              <pic:blipFill>
+                <a:blip r:embed="${rId}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>
+                <a:stretch><a:fillRect/></a:stretch>
+              </pic:blipFill>
+              <pic:spPr>
+                <a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm>
+                <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+                <a:ln w="9525"><a:solidFill><a:srgbClr val="1178CC"/></a:solidFill></a:ln>
+              </pic:spPr>
+            </pic:pic>
+          </a:graphicData>
+        </a:graphic>
+      </wp:inline>
+    </w:drawing>
+  </w:r>`
+}
+
+function docxImagePart(profile) {
+  if (!profile.photo_path) return null
+  const fullPath = `${PROJECT_ROOT}/${profile.photo_path}`
+  if (!existsSync(fullPath)) return null
+  const extension = fullPath.toLowerCase().endsWith('.png') ? 'png' : 'jpeg'
+  return {
+    extension,
+    contentType: extension === 'png' ? 'image/png' : 'image/jpeg',
+    path: `word/media/resume-photo.${extension === 'jpeg' ? 'jpg' : extension}`,
+    relationshipTarget: `media/resume-photo.${extension === 'jpeg' ? 'jpg' : extension}`,
+    data: readFileSync(fullPath)
+  }
+}
+
+function buildDocxDocumentXml(resume, options = {}) {
+  const imageRelId = options.imageRelId || ''
   const nameLine = resume.profile.full_name || '候选人姓名'
-  const contactLine0 = (resume.profile.gender || resume.profile.age)
-    ? `${resume.profile.gender || ''}${resume.profile.age ? ' · ' + resume.profile.age + '岁' : ''}`
-    : ''
-  const contactLine1 = [
-    resume.profile.phone && `手机：${resume.profile.phone}`,
-    resume.profile.email && `邮箱：${resume.profile.email}`
-  ].filter(Boolean).join('  |  ')
-  const contactLine2 = [
-    resume.profile.wechat && `微信：${resume.profile.wechat}`,
-    resume.profile.github && `GitHub：${resume.profile.github}`
-  ].filter(Boolean).join('  |  ')
+  const contactPairs = [
+    (resume.profile.gender || resume.profile.age) ? `${resume.profile.gender || ''}${resume.profile.age ? ' · ' + resume.profile.age + '岁' : ''}` : '',
+    resume.profile.phone ? `手机：${resume.profile.phone}` : '',
+    resume.profile.email ? `邮箱：${resume.profile.email}` : '',
+    resume.profile.wechat ? `微信：${resume.profile.wechat}` : '',
+    resume.profile.github ? `GitHub：${resume.profile.github}` : ''
+  ].filter(Boolean)
 
   const modules = normalizeResumeModules(resume.modules)
 
@@ -2876,7 +3050,12 @@ function buildDocxDocumentXml(resume) {
       ? [
           wSectionTitle('工作经历'),
           ...resume.experience.flatMap(exp => [
-            wParagraph(`${exp.company}    ${exp.position}    ${exp.time}`, 'ItemTitle'),
+            wTable([
+              wTableRow([
+                wTableCell(wParagraphRuns([wRun(exp.company || '', { bold: true, color: '1178CC', size: '24' })]), 5200),
+                wTableCell(wParagraphRuns([wRun(`${exp.position || ''}${exp.time ? ` | ${exp.time}` : ''}`, { bold: true, color: '1178CC', size: '24' })], '', '<w:jc w:val="right"/>'), 3400)
+              ])
+            ], [5200, 3400], { borders: 'none' }),
             ...exp.bullets.map(wBullet)
           ])
         ]
@@ -2885,8 +3064,13 @@ function buildDocxDocumentXml(resume) {
       ? [
           wSectionTitle('项目经历'),
           ...resume.projects.flatMap(project => [
-            wParagraph(`${project.title}    ${project.role || ''}`, 'ItemTitle'),
-            project.time ? wParagraph(project.time, 'Muted') : '',
+            wTable([
+              wTableRow([
+                wTableCell(wParagraphRuns([wRun(project.title || '', { bold: true, color: '1178CC', size: '24' })]), 3600),
+                wTableCell(wParagraphRuns([wRun(project.role || '', { color: '475569', size: '22' })], '', '<w:jc w:val="center"/>'), 2200),
+                wTableCell(wParagraphRuns([wRun(project.time || '', { color: '64748B', size: '22' })], '', '<w:jc w:val="right"/>'), 2800)
+              ])
+            ], [3600, 2200, 2800], { borders: 'none' }),
             project.stack ? `<w:p><w:pPr><w:pStyle w:val="Bullet"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">技术栈：</w:t></w:r><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${escapeXml(project.stack)}</w:t></w:r></w:p>` : '',
             ...project.bullets.map(wBullet)
           ])
@@ -2895,8 +3079,12 @@ function buildDocxDocumentXml(resume) {
     education: () => resume.education && (resume.education.school || resume.education.bullets?.length)
       ? [
           wSectionTitle('教育背景'),
-          resume.education.school ? wParagraph(resume.education.school, 'ItemTitle') : '',
-          resume.education.time ? wParagraph(resume.education.time, 'Muted') : '',
+          resume.education.school || resume.education.time ? wTable([
+            wTableRow([
+              wTableCell(wParagraphRuns([wRun(resume.education.school || '', { bold: true, color: '1178CC', size: '24' })]), 5200),
+              wTableCell(wParagraphRuns([wRun(resume.education.time || '', { color: '64748B', size: '22' })], '', '<w:jc w:val="right"/>'), 3400)
+            ])
+          ], [5200, 3400], { borders: 'none' }) : '',
           ...(resume.education.bullets || []).map(wBullet)
         ]
       : [],
@@ -2905,14 +3093,34 @@ function buildDocxDocumentXml(resume) {
       : []
   }
 
-  const body = [
+  const headerLeft = [
     wParagraph(nameLine, 'Name'),
-    ...(contactLine0 ? [wParagraph(contactLine0, 'Contact')] : []),
-    wParagraph(contactLine1, 'Contact'),
-    ...(contactLine2 ? [wParagraph(contactLine2, 'Contact')] : []),
+    ...Array.from({ length: Math.ceil(contactPairs.length / 2) }, (_, i) => {
+      const left = contactPairs[i * 2] || ''
+      const right = contactPairs[i * 2 + 1] || ''
+      return wTable([
+        wTableRow([
+          wTableCell(left ? wParagraphRuns([wRun(left, { color: '475569', size: '22' })], '', '<w:spacing w:after="40"/>') : '<w:p/>', 4200),
+          wTableCell(right ? wParagraphRuns([wRun(right, { color: '475569', size: '22' })], '', '<w:spacing w:after="40"/>') : '<w:p/>', 4200)
+        ])
+      ], [4200, 4200], { borders: 'none' })
+    })
+  ].join('')
+
+  const headerRows = [
+    wTableRow([
+      wTableCell(headerLeft, imageRelId ? 7600 : 9000, { vAlign: 'top' }),
+      ...(imageRelId ? [wTableCell(wParagraphRuns([wDrawingImage(imageRelId, 900000, 1152000)]), 1400, { vAlign: 'top' })] : [])
+    ])
+  ]
+
+  const headerTable = wTable(headerRows, imageRelId ? [7600, 1400] : [9000], { borders: 'header' })
+
+  const body = [
+    headerTable,
     ...modules.filter(mod => mod.enabled).flatMap(mod => {
       if (mod.type === 'custom' && mod.content) {
-        return [wSectionTitle(mod.name), wParagraph(mod.content)]
+        return [wSectionTitle(mod.name), ...String(mod.content || '').split('\n').filter(Boolean).map(line => wParagraph(line))]
       }
       const renderer = moduleRenderers[mod.id]
       return renderer ? renderer() : []
@@ -2920,7 +3128,7 @@ function buildDocxDocumentXml(resume) {
   ].join('')
 
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
   <w:body>
     ${body}
     <w:sectPr>
@@ -2936,23 +3144,37 @@ function buildDocxStylesXml() {
 <w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Microsoft YaHei" w:eastAsia="Microsoft YaHei"/><w:sz w:val="23"/></w:rPr></w:rPrDefault></w:docDefaults>
   <w:style w:type="paragraph" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:after="100" w:line="280" w:lineRule="auto"/></w:pPr><w:rPr><w:rFonts w:ascii="Microsoft YaHei" w:eastAsia="Microsoft YaHei"/><w:color w:val="1E293B"/><w:sz w:val="23"/></w:rPr></w:style>
-  <w:style w:type="paragraph" w:styleId="Name"><w:name w:val="Name"/><w:qFormat/><w:pPr><w:spacing w:after="100"/></w:pPr><w:rPr><w:rFonts w:ascii="Microsoft YaHei" w:eastAsia="Microsoft YaHei"/><w:b/><w:color w:val="0284C7"/><w:sz w:val="40"/></w:rPr></w:style>
-  <w:style w:type="paragraph" w:styleId="Contact"><w:name w:val="Contact"/><w:qFormat/><w:pPr><w:spacing w:after="200"/><w:pBdr><w:bottom w:val="single" w:sz="8" w:space="6" w:color="0EA5E9"/></w:pBdr></w:pPr><w:rPr><w:color w:val="475569"/><w:sz w:val="22"/></w:rPr></w:style>
-  <w:style w:type="paragraph" w:styleId="SectionTitle"><w:name w:val="SectionTitle"/><w:qFormat/><w:pPr><w:jc w:val="center"/><w:spacing w:before="180" w:after="100"/><w:pBdr><w:bottom w:val="single" w:sz="4" w:space="6" w:color="999999"/></w:pBdr></w:pPr><w:rPr><w:b/><w:color w:val="000000"/><w:sz w:val="26"/></w:rPr></w:style>
-  <w:style w:type="paragraph" w:styleId="ItemTitle"><w:name w:val="ItemTitle"/><w:qFormat/><w:pPr><w:spacing w:before="100" w:after="40"/></w:pPr><w:rPr><w:b/><w:color w:val="0EA5E9"/><w:sz w:val="24"/></w:rPr></w:style>
+  <w:style w:type="paragraph" w:styleId="Name"><w:name w:val="Name"/><w:qFormat/><w:pPr><w:spacing w:after="80"/></w:pPr><w:rPr><w:rFonts w:ascii="Microsoft YaHei" w:eastAsia="Microsoft YaHei"/><w:b/><w:color w:val="1178CC"/><w:sz w:val="56"/></w:rPr></w:style>
+  <w:style w:type="paragraph" w:styleId="SectionTitle"><w:name w:val="SectionTitle"/><w:qFormat/><w:pPr><w:jc w:val="center"/><w:spacing w:before="200" w:after="120"/><w:pBdr><w:top w:val="single" w:sz="4" w:space="1" w:color="999999"/><w:bottom w:val="single" w:sz="4" w:space="1" w:color="999999"/></w:pBdr></w:pPr><w:rPr><w:b/><w:color w:val="000000"/><w:sz w:val="28"/></w:rPr></w:style>
+  <w:style w:type="paragraph" w:styleId="ItemTitle"><w:name w:val="ItemTitle"/><w:qFormat/><w:pPr><w:spacing w:before="60" w:after="40"/></w:pPr><w:rPr><w:b/><w:color w:val="1178CC"/><w:sz w:val="24"/></w:rPr></w:style>
   <w:style w:type="paragraph" w:styleId="Muted"><w:name w:val="Muted"/><w:qFormat/><w:pPr><w:spacing w:after="60"/></w:pPr><w:rPr><w:color w:val="64748B"/><w:sz w:val="22"/></w:rPr></w:style>
   <w:style w:type="paragraph" w:styleId="Bullet"><w:name w:val="Bullet"/><w:qFormat/><w:pPr><w:ind w:left="360" w:hanging="180"/><w:spacing w:after="60"/></w:pPr><w:rPr><w:color w:val="1E293B"/><w:sz w:val="23"/></w:rPr></w:style>
 </w:styles>`
 }
 
 function createDocxBuffer(resume) {
-  return createZip([
-    { name: '[Content_Types].xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>` },
+  const imagePart = docxImagePart(resume.profile)
+  const imageRelId = imagePart ? 'rIdImage1' : ''
+  const contentTypes = [
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>',
+    '<Default Extension="xml" ContentType="application/xml"/>',
+    imagePart ? `<Default Extension="${imagePart.extension === 'jpeg' ? 'jpg' : imagePart.extension}" ContentType="${imagePart.contentType}"/>` : '',
+    '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>',
+    '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>'
+  ].filter(Boolean).join('')
+  const docRels = [
+    '<Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>',
+    imagePart ? `<Relationship Id="${imageRelId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${imagePart.relationshipTarget}"/>` : ''
+  ].filter(Boolean).join('')
+  const entries = [
+    { name: '[Content_Types].xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">${contentTypes}</Types>` },
     { name: '_rels/.rels', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>` },
-    { name: 'word/_rels/document.xml.rels', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>` },
-    { name: 'word/document.xml', data: buildDocxDocumentXml(resume) },
+    { name: 'word/_rels/document.xml.rels', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${docRels}</Relationships>` },
+    { name: 'word/document.xml', data: buildDocxDocumentXml(resume, { imageRelId }) },
     { name: 'word/styles.xml', data: buildDocxStylesXml() }
-  ])
+  ]
+  if (imagePart) entries.push({ name: imagePart.path, data: imagePart.data })
+  return createZip(entries)
 }
 
 function imageDataUrl(profile) {
@@ -4090,6 +4312,12 @@ const routes = {
       return { success: true }
     }
   },
+  '/api/resume/modules/:id/data': {
+    PATCH: async (body, params) => {
+      const profile = saveResumeModuleData(params.id, body || {})
+      return { success: true, data: profile }
+    }
+  },
   '/api/companies': {
     GET: async () => {
       return { success: true, data: readCompanies() }
@@ -4538,7 +4766,8 @@ const routes = {
       
       const date = new Date().toISOString().split('T')[0]
       const profile = getResumeProfile()
-      const fileName = resumeFileName(job, profile, date, 'docx')
+      const stem = resumeFileStem(job, profile, date)
+      const { docx: fileName } = resolveUniqueResumeArtifactNames(stem, [{ dir: 'output', extension: 'docx' }])
       const resume = await buildTailoredResume(job, profile, body.provider)
       const docx = createDocxBuffer(resume)
       writeFileSync(`${PROJECT_ROOT}/output/${fileName}`, docx)
@@ -4553,10 +4782,14 @@ const routes = {
       
       const date = new Date().toISOString().split('T')[0]
       const profile = getResumeProfile()
-      const fileName = resumeFileName(job, profile, date, 'pdf')
-      const htmlName = resumeFileName(job, profile, date, 'html')
+      const stem = resumeFileStem(job, profile, date)
+      const artifactNames = resolveUniqueResumeArtifactNames(stem, [
+        { dir: 'output', extension: 'pdf' },
+        { dir: 'tmp', extension: 'html' }
+      ])
+      const fileName = artifactNames.pdf
+      const htmlName = artifactNames.html
       const htmlPath = `${PROJECT_ROOT}/tmp/${htmlName}`
-      const pdfPath = `${PROJECT_ROOT}/output/${fileName}`
       const resume = await buildTailoredResume(job, profile, body.provider)
       writeFileSync(htmlPath, buildResumeHtml(resume), 'utf-8')
       await execFileAsync('node', ['scripts/cv/generate-pdf.mjs', `tmp/${htmlName}`, `output/${fileName}`, '--format=a4'], { cwd: PROJECT_ROOT })
@@ -4591,6 +4824,17 @@ const routes = {
       const { unlinkSync } = await import('fs')
       unlinkSync(fullPath)
       return { success: true }
+    }
+  },
+  '/api/resume/files': {
+    GET: async () => {
+      return { success: true, data: listGeneratedResumeFiles() }
+    }
+  },
+  '/api/resume/photo': {
+    DELETE: async () => {
+      const profile = deleteResumePhoto()
+      return { success: true, data: profile }
     }
   },
   '/api/jobs/:id/tracker-addition': {
@@ -5529,6 +5773,32 @@ async function handleRequest(req, res) {
   const { method, url } = req
 
   const requestPath = decodeURIComponent(url.split('?')[0])
+  if (method === 'GET' && requestPath === '/api/resume/photo') {
+    const queryString = url.includes('?') ? url.slice(url.indexOf('?') + 1) : ''
+    const query = Object.fromEntries(new URLSearchParams(queryString))
+    const relativePath = String(query.path || '').replace(/^\/+/, '').replace(/\\/g, '/')
+    if (!relativePath.startsWith('data/job-radar/')) {
+      res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' })
+      res.end('Invalid photo path')
+      return
+    }
+    const filePath = `${PROJECT_ROOT}/${relativePath}`
+    if (!existsSync(filePath)) {
+      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' })
+      res.end('Photo not found')
+      return
+    }
+    const lower = filePath.toLowerCase()
+    const type = lower.endsWith('.png')
+      ? 'image/png'
+      : lower.endsWith('.jpg') || lower.endsWith('.jpeg')
+        ? 'image/jpeg'
+        : 'application/octet-stream'
+    res.writeHead(200, { 'Content-Type': type })
+    res.end(readFileSync(filePath))
+    return
+  }
+
   if (method === 'GET' && requestPath.startsWith('/output/')) {
     const relativePath = requestPath.replace(/^\/+/, '')
     const filePath = `${PROJECT_ROOT}/${relativePath}`

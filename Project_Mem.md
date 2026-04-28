@@ -1,6 +1,6 @@
 # Project_Mem.md — Career-Ops 项目交接文档
 
-> 生成日期：2026-04-28
+> 生成日期：2026-04-28（再次更新）
 > 项目版本：v1.3.1
 > 原始作者：Santiago Fernández de Valderrama (santifer.io)
 > 许可证：MIT
@@ -117,9 +117,11 @@ career-ops/
 ### 3.4 前端体验问题（中等）
 
 1. ~~首次使用向导字段不全、表单为纯 textarea~~ → **已修复**：结构化表单 + 每卡独立保存
-2. 面试准备题目少时页面可用，但题目增多后缺少分类、搜索、筛选
-3. 简历生成无风险提示，用户无法看到哪些内容是 AI 生成、需要确认
-4. localStorage 缓存面试准备，schema 变更后旧缓存缺字段不兼容
+2. ~~简历生成页基本信息/模块管理无折叠功能~~ → **已修复**：默认折叠 + 点击标题栏展开/收起
+3. ~~简历生成基本信息区块无保存按钮和操作反馈~~ → **已修复**：新增保存按钮 + 4状态视觉反馈（idle/saving/success/error）
+4. 面试准备题目少时页面可用，但题目增多后缺少分类、搜索、筛选
+5. 简历生成无风险提示，用户无法看到哪些内容是 AI 生成、需要确认
+6. localStorage 缓存面试准备，schema 变更后旧缓存缺字段兼容
 
 ---
 
@@ -218,6 +220,38 @@ career-ops/
 - `renderCvMarkdown()` — 按结构化字段生成格式化 Markdown
 - `saveOnboardingFiles()` — 同步写入 onboarding-cache.json + resume-profile.json 新增 gender/age/wechat
 - `loadOnboardingCache()` / `GET /api/onboarding` — 返回已缓存的原始表单 payload |
+
+### 5.5 简历生成页（ResumeBuilder）体验优化
+
+**修改文件：** `gui/src/pages/ResumeBuilder.jsx`、`gui/src/api/index.js`、`gui/src/styles/index.css`、`gui/server.mjs`
+
+**功能变更：**
+
+| 功能 | 说明 |
+|------|------|
+| **默认折叠** | 基本信息区 (`basic`) 和模块管理区 (`modules`) 默认 `expandedSections` 设为 `false` |
+| **点击整栏展开** | `SectionHeader` 组件新增 `onToggle` + `isExpanded` props；传参后标题栏添加 `.clickable` class，点击任意位置切换折叠，右侧自动显示 ChevronUp/Down 箭头 |
+| **基本信息保存按钮** | 在"个人简介" textarea 下方新增右对齐保存按钮 |
+| **4状态保存反馈** | 新增 `basicSaveStatus` state（`idle`/`saving`/`success`/`error`）：idle=蓝色"保存基本信息"，saving="保存中..."禁用，success=绿色"✓ 已保存"(2s)，error=红色"✕ 校验失败"(2s) |
+| **基本信息独立校验** | 新增 `validateBasicInfo()` 只校验已填写的电话/邮箱格式；姓名/电话/邮箱均已改为选填。基本信息保存按钮使用此轻量校验；原 `validateForm()` 完整校验保留供后续简历生成时使用 |
+| **描述精简** | 基本信息描述从"用于后续 Word/PDF 简历生成，优先级高于 cv.md 中的联系方式"精简为"用于后续 Word/PDF 简历生成" |
+| **模块子项独立保存** | 简历模块管理中的 `education / experience / projects` 内置数据模块新增“保存当前模块”按钮和 `saving/success/error` 反馈；自定义模块的新增/编辑也增加同样的按钮内反馈 |
+| **模块级后端接口** | 后端新增 `PATCH /api/resume/modules/:id/data`，内置数据模块保存不再冒用整份 `resume/profile` 保存 |
+| **项目字段放宽** | 项目名称、项目描述取消前端必填；后端渲染与生成链路已兼容空项目名/空描述，避免预览或导出坏格式 |
+| **时间选择器对齐** | 教育背景、项目经历的时间输入已切换为与 Onboarding 一致的“年 / 月 + 至今”自定义日期选择器，数据格式保持 `YYYY-MM / present` |
+| **预览简历重做** | 预览页改为接近正式简历导出的版式：蓝色页眉、分节标题线、条目式排版、头像显示；预览直接使用当前表单状态，不依赖先保存再回读 |
+| **预览空态防护** | 无可预览内容时不再打开空白弹层；按钮点击前会提示“暂无可预览内容”，弹层内部也保留空状态兜底 |
+| **个人照片闭环** | 基本信息区已支持上传、替换、删除个人照片；前端显示缩略图，预览与导出复用同一照片源。后端新增 `GET /api/resume/photo` 与 `DELETE /api/resume/photo` |
+| **生成文件管理** | 进入简历生成页时会自动扫描 `output/` 下已有 `.pdf/.docx` 并显示；前端删除文件会同步删除 `output/` 中对应文件 |
+| **同名文件自动编号** | 连续生成同名 PDF/Word 时，后端会自动追加 `(1)`、`(2)` 等后缀，避免覆盖 |
+| **Word 导出对齐 PDF** | `createDocxBuffer()` 已改为更接近 PDF 的版式：页眉姓名/联系方式、头像嵌入、分节标题、项目/经历/教育横向排布，同时保留 `.docx` 可编辑性 |
+
+**技术细节：**
+- `SectionHeader` 组件签名从 `(icon, title, description, actions)` 扩展为 `(icon, title, description, actions, onToggle?, isExpanded?)`
+- 模块管理区的"添加自定义模块"按钮添加 `e.stopPropagation()` 防止触发父级折叠事件
+- 新增 `resolvePhotoSrc()` 统一处理本地预览图、未保存 base64 图、后端已保存图片三种来源
+- 新增 `listGeneratedResumeFiles()` 扫描 `output/`，并通过 `GET /api/resume/files` 暴露给前端
+- `ResumeBuilder` 中文件删除逻辑已改为“后端删除成功后再从前端列表移除”；若磁盘文件已不存在，则提示后清理前端陈旧记录
 
 ---
 

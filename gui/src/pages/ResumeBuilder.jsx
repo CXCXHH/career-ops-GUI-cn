@@ -3,9 +3,9 @@ import { FileText, FileImage, CheckCircle, Save, Upload, GripVertical, Plus, Tra
 import { aiAPI, jobsAPI, resumeAPI } from '../api'
 import { showToast } from '../utils/toast'
 
-function SectionHeader({ icon: Icon, title, description, actions }) {
+function SectionHeader({ icon: Icon, title, description, actions, onToggle, isExpanded }) {
   return (
-    <div className="section-header">
+    <div className={`section-header${onToggle ? ' clickable' : ''}`} onClick={onToggle}>
       <div className="section-title">
         <Icon className="section-icon" />
         <div>
@@ -14,6 +14,7 @@ function SectionHeader({ icon: Icon, title, description, actions }) {
         </div>
       </div>
       {actions}
+      {onToggle && (isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />)}
     </div>
   )
 }
@@ -59,6 +60,56 @@ function FormTextarea({ label, name, value, onChange, rows = 3, placeholder, req
   )
 }
 
+const YEAR_MIN = 2000
+const YEAR_MAX = 2050
+const MONTHS = ['01','02','03','04','05','06','07','08','09','10','11','12']
+const YEAR_OPTIONS = Array.from({ length: YEAR_MAX - YEAR_MIN + 1 }, (_, i) => YEAR_MIN + i)
+
+function parseDateVal(v) {
+  if (!v || typeof v !== 'string') return { year: '', month: '' }
+  const m = v.match(/^(\d{4})-(\d{2})$/)
+  return m ? { year: m[1], month: m[2] } : { year: '', month: '' }
+}
+
+function MonthSelect({ value, onChange }) {
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)} className="date-select date-select-month">
+      <option value="">月</option>
+      {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+    </select>
+  )
+}
+
+function YearSelect({ value, onChange, onToggleFold }) {
+  return (
+    <div className="date-year-wrap" onClick={onToggleFold}>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="date-select date-select-year" onClick={(e) => e.stopPropagation()}>
+        <option value="">年</option>
+        {YEAR_OPTIONS.map(y => <option key={y} value={String(y)}>{y}</option>)}
+      </select>
+    </div>
+  )
+}
+
+function DateField({ value, onChange }) {
+  const { year, month } = parseDateVal(value)
+  const [folded, setFolded] = useState(false)
+
+  const updateYear = (y) => {
+    onChange((month && y) ? `${y}-${month}` : '')
+  }
+  const updateMonth = (m) => {
+    onChange((year && m) ? `${year}-${m}` : '')
+  }
+
+  return (
+    <div className={`date-field ${folded ? 'folded' : ''}`}>
+      <YearSelect value={year} onChange={updateYear} onToggleFold={() => setFolded(f => !f)} />
+      {!folded && <MonthSelect value={month} onChange={updateMonth} />}
+    </div>
+  )
+}
+
 function DateRangePicker({ startName, endName, startValue, endValue, onChange }) {
   return (
     <div className="date-range">
@@ -89,12 +140,34 @@ function DateRangePicker({ startName, endName, startValue, endValue, onChange })
   )
 }
 
+function StructuredDateRangePicker({ startName, endName, startValue, endValue, onChange }) {
+  const isPresent = endValue === 'present'
+  return (
+    <div className="date-range-picker">
+      <DateField value={startValue} onChange={(value) => onChange(startName, value)} />
+      <span className="date-arrow">→</span>
+      {isPresent
+        ? <span className="date-present">至今</span>
+        : <DateField value={endValue} onChange={(value) => onChange(endName, value)} />
+      }
+      <button
+        type="button"
+        className={`date-toggle-present ${isPresent ? 'active' : ''}`}
+        onClick={() => onChange(endName, isPresent ? '' : 'present')}
+        title={isPresent ? '取消至今' : '设为至今'}
+      >
+        至今
+      </button>
+    </div>
+  )
+}
+
 function EducationItem({ item, index, onChange, onDelete }) {
   return (
     <div className="timeline-item">
       <div className="timeline-header">
         <div className="timeline-dates">
-          <DateRangePicker
+          <StructuredDateRangePicker
             startName={`education[${index}].start_date`}
             endName={`education[${index}].end_date`}
             startValue={item.start_date}
@@ -210,7 +283,7 @@ function ProjectItem({ item, index, onChange, onDelete }) {
     <div className="timeline-item">
       <div className="timeline-header">
         <div className="timeline-dates">
-          <DateRangePicker
+          <StructuredDateRangePicker
             startName={`projects[${index}].start_date`}
             endName={`projects[${index}].end_date`}
             startValue={item.start_date}
@@ -229,7 +302,6 @@ function ProjectItem({ item, index, onChange, onDelete }) {
           value={item.name}
           onChange={onChange}
           placeholder="请输入项目名称"
-          required
         />
         <FormInput
           label="项目角色"
@@ -246,7 +318,6 @@ function ProjectItem({ item, index, onChange, onDelete }) {
         onChange={onChange}
         rows={3}
         placeholder="请描述项目背景、目标、规模等"
-        required
       />
       <FormInput
         label="技术栈"
@@ -302,16 +373,36 @@ function ModuleItem({ module, index, onToggle, onEdit, onDelete, onEditData, onD
 function AddModuleForm({ onAdd, onCancel }) {
   const [name, setName] = useState('')
   const [content, setContent] = useState('')
+  const [saveStatus, setSaveStatus] = useState('idle')
   const nameRef = useRef(null)
 
   useEffect(() => {
     nameRef.current?.focus()
   }, [])
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!name.trim()) return
-    onAdd({ name: name.trim(), content: content.trim() })
+    setSaveStatus('saving')
+    const ok = await onAdd({ name: name.trim(), content: content.trim() })
+    if (!ok) {
+      setSaveStatus('error')
+      setTimeout(() => setSaveStatus('idle'), 2000)
+      return
+    }
+    setSaveStatus('success')
+    setTimeout(() => {
+      setSaveStatus('idle')
+      onCancel()
+    }, 800)
   }
+
+  const submitLabel = saveStatus === 'saving'
+    ? '添加中...'
+    : saveStatus === 'success'
+      ? '✓ 已添加'
+      : saveStatus === 'error'
+        ? '✕ 添加失败'
+        : '添加'
 
   return (
     <div className="add-module-form">
@@ -324,7 +415,7 @@ function AddModuleForm({ onAdd, onCancel }) {
         <textarea className="form-input" rows="3" value={content} onChange={(e) => setContent(e.target.value)} placeholder="在此输入该模块要展示的文本内容" />
       </div>
       <div className="form-actions">
-        <button className="btn btn-primary btn-sm" onClick={handleSubmit} disabled={!name.trim()}>添加</button>
+        <button className="btn btn-primary btn-sm" onClick={handleSubmit} disabled={!name.trim() || saveStatus === 'saving'}>{submitLabel}</button>
         <button className="btn btn-secondary btn-sm" onClick={onCancel}>取消</button>
       </div>
     </div>
@@ -334,6 +425,31 @@ function AddModuleForm({ onAdd, onCancel }) {
 function EditModuleForm({ module, onSave, onCancel }) {
   const [name, setName] = useState(module.name || '')
   const [content, setContent] = useState(module.content || '')
+  const [saveStatus, setSaveStatus] = useState('idle')
+
+  const handleSubmit = async () => {
+    if (!name.trim()) return
+    setSaveStatus('saving')
+    const ok = await onSave({ name: name.trim(), content: content.trim() })
+    if (!ok) {
+      setSaveStatus('error')
+      setTimeout(() => setSaveStatus('idle'), 2000)
+      return
+    }
+    setSaveStatus('success')
+    setTimeout(() => {
+      setSaveStatus('idle')
+      onCancel()
+    }, 800)
+  }
+
+  const submitLabel = saveStatus === 'saving'
+    ? '保存中...'
+    : saveStatus === 'success'
+      ? '✓ 已保存'
+      : saveStatus === 'error'
+        ? '✕ 保存失败'
+        : '保存'
 
   return (
     <div className="add-module-form">
@@ -346,14 +462,29 @@ function EditModuleForm({ module, onSave, onCancel }) {
         <textarea className="form-input" rows="3" value={content} onChange={(e) => setContent(e.target.value)} />
       </div>
       <div className="form-actions">
-        <button className="btn btn-primary btn-sm" onClick={() => onSave({ name: name.trim(), content: content.trim() })} disabled={!name.trim()}>保存</button>
+        <button className="btn btn-primary btn-sm" onClick={handleSubmit} disabled={!name.trim() || saveStatus === 'saving'}>{submitLabel}</button>
         <button className="btn btn-secondary btn-sm" onClick={onCancel}>取消</button>
       </div>
     </div>
   )
 }
 
-function PreviewModal({ profile, education, experience, projects, modules, onClose }) {
+function resolvePhotoSrc(profile, photoPreview = '') {
+  if (photoPreview) return photoPreview
+  if (profile?.photoData) return profile.photoData
+  if (profile?.photo_path) return `/api/resume/photo?path=${encodeURIComponent(profile.photo_path)}`
+  return ''
+}
+
+function PreviewModal({ profile, education, experience, projects, modules, photoPreview, onClose }) {
+  const asText = (value) => {
+    if (Array.isArray(value)) return value.map(item => String(item || '').trim()).filter(Boolean).join('、')
+    return String(value || '').trim()
+  }
+
+  const hasText = (value) => asText(value).length > 0
+  const photoSrc = resolvePhotoSrc(profile, photoPreview)
+
   const formatDate = (date) => {
     if (!date) return ''
     if (date === 'present') return '至今'
@@ -362,88 +493,122 @@ function PreviewModal({ profile, education, experience, projects, modules, onClo
   }
 
   const enabledModules = (modules || []).filter(m => m.enabled)
+  const hasHeaderContent = Boolean(
+    hasText(profile.full_name) ||
+    hasText(profile.gender) ||
+    hasText(profile.age) ||
+    hasText(profile.phone) ||
+    hasText(profile.email) ||
+    hasText(profile.wechat) ||
+    hasText(profile.github)
+  )
+
+  const renderBulletLines = (text) => asText(text)
+    .split(/[；;\n]/)
+    .map(item => item.trim())
+    .filter(Boolean)
+
+  const renderSectionTitle = (title) => (
+    <div className="resume-preview-section-title">
+      <span className="line" />
+      <span>{title}</span>
+      <span className="line" />
+    </div>
+  )
 
   const renderModule = (mod) => {
     if (mod.type === 'custom' && mod.content) {
       return (
-        <div key={mod.id} className="preview-section">
-          <h3>{mod.name}</h3>
-          <p style={{ whiteSpace: 'pre-line' }}>{mod.content}</p>
-        </div>
+        <section key={mod.id} className="resume-preview-section">
+          {renderSectionTitle(mod.name)}
+          <p className="resume-preview-paragraph" style={{ whiteSpace: 'pre-line' }}>{mod.content}</p>
+        </section>
       )
     }
 
     switch (mod.id) {
       case 'summary':
-        return profile.summary ? (
-          <div key="summary" className="preview-section">
-            <h3>求职定位</h3>
-            <p>{profile.summary}</p>
-          </div>
+        return hasText(profile.summary) ? (
+          <section key="summary" className="resume-preview-section">
+            {renderSectionTitle('求职定位')}
+            <p className="resume-preview-paragraph">{asText(profile.summary)}</p>
+          </section>
         ) : null
       case 'skills': {
-        const skillsText = profile.skills || ''
+        const skillsText = asText(profile.skills)
         if (!skillsText) return null
         const skillItems = skillsText.split(/[、,，|]/).filter(Boolean)
         return (
-          <div key="skills" className="preview-section">
-            <h3>核心能力</h3>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+          <section key="skills" className="resume-preview-section">
+            {renderSectionTitle('核心能力')}
+            <div className="resume-preview-skill-line">
               {skillItems.map((s, i) => (
-                <span key={i} style={{ border: '1px solid #bfdbfe', background: '#eff6ff', color: '#1d4ed8', padding: '2px 8px', borderRadius: '3px', fontSize: '13px' }}>{s.trim()}</span>
+                <span key={i} className="resume-preview-skill-item">{s.trim()}</span>
               ))}
             </div>
-          </div>
+          </section>
         )
       }
       case 'experience':
         return experience.length > 0 ? (
-          <div key="experience" className="preview-section">
-            <h3>工作经历</h3>
+          <section key="experience" className="resume-preview-section">
+            {renderSectionTitle('工作经历')}
             {experience.map((item, i) => (
-              <div key={i} className="preview-item">
-                <div className="preview-item-header">
-                  <span className="preview-item-title">{item.company} - {item.position}</span>
-                  <span className="preview-item-date">{formatDate(item.start_date)} ~ {formatDate(item.end_date)}</span>
+              <div key={i} className="resume-preview-item">
+                <div className="resume-preview-item-head">
+                  <span>{[asText(item.company), asText(item.position)].filter(Boolean).join(' | ')}</span>
+                  <span className="resume-preview-muted">{formatDate(item.start_date)} ~ {formatDate(item.end_date)}</span>
                 </div>
-                {item.role && <p className="preview-item-sub">{item.role}</p>}
-                {item.description && <p className="preview-item-desc">{item.description}</p>}
+                {hasText(item.role) && <div className="resume-preview-subline">分工：{asText(item.role)}</div>}
+                {renderBulletLines(item.description).length > 0 && (
+                  <ul className="resume-preview-bullets">
+                    {renderBulletLines(item.description).map((line, idx) => <li key={idx}>{line}</li>)}
+                  </ul>
+                )}
               </div>
             ))}
-          </div>
+          </section>
         ) : null
       case 'projects':
         return projects.length > 0 ? (
-          <div key="projects" className="preview-section">
-            <h3>项目经历</h3>
+          <section key="projects" className="resume-preview-section">
+            {renderSectionTitle('项目经历')}
             {projects.map((item, i) => (
-              <div key={i} className="preview-item">
-                <div className="preview-item-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span className="preview-item-title" style={{ flex: 1 }}>{item.name}</span>
-                  {item.role && <span style={{ flex: 1, textAlign: 'center', color: '#64748b', fontSize: '12px' }}>{item.role}</span>}
-                  <span className="preview-item-date" style={{ flex: 1, textAlign: 'right', color: '#64748b', fontSize: '12px' }}>{formatDate(item.start_date)} ~ {formatDate(item.end_date)}</span>
+              <div key={i} className="resume-preview-item">
+                <div className="resume-preview-item-head resume-preview-item-head-triplet">
+                  <span>{asText(item.name) || '项目经历'}</span>
+                  <span className="resume-preview-centered">{asText(item.role)}</span>
+                  <span className="resume-preview-muted resume-preview-right">{formatDate(item.start_date)} ~ {formatDate(item.end_date)}</span>
                 </div>
-                {item.tech_stack && <p className="preview-item-sub"><strong>技术栈：</strong><strong>{item.tech_stack}</strong></p>}
-                {item.description && <p className="preview-item-desc" style={{ whiteSpace: 'pre-line' }}>{item.description}</p>}
+                {hasText(item.tech_stack) && <div className="resume-preview-subline"><strong>技术栈：</strong>{asText(item.tech_stack)}</div>}
+                {renderBulletLines(item.description).length > 0 && (
+                  <ul className="resume-preview-bullets">
+                    {renderBulletLines(item.description).map((line, idx) => <li key={idx}>{line}</li>)}
+                  </ul>
+                )}
               </div>
             ))}
-          </div>
+          </section>
         ) : null
       case 'education':
         return education.length > 0 ? (
-          <div key="education" className="preview-section">
-            <h3>教育背景</h3>
+          <section key="education" className="resume-preview-section">
+            {renderSectionTitle('教育背景')}
             {education.map((item, i) => (
-              <div key={i} className="preview-item">
-                <div className="preview-item-header">
-                  <span className="preview-item-title">{item.school} - {item.major}</span>
-                  <span className="preview-item-date">{formatDate(item.start_date)} ~ {formatDate(item.end_date)}</span>
+              <div key={i} className="resume-preview-item">
+                <div className="resume-preview-item-head">
+                  <span>{[asText(item.school), asText(item.major), asText(item.degree)].filter(Boolean).join(' | ')}</span>
+                  <span className="resume-preview-muted">{formatDate(item.start_date)} ~ {formatDate(item.end_date)}</span>
                 </div>
-                <p className="preview-item-sub">{item.degree} {item.gpa && `| GPA: ${item.gpa}`}</p>
-                {item.description && <p className="preview-item-desc">{item.description}</p>}
+                {(hasText(item.gpa) || hasText(item.description)) && (
+                  <ul className="resume-preview-bullets">
+                    {hasText(item.gpa) && <li>GPA：{asText(item.gpa)}</li>}
+                    {renderBulletLines(item.description).map((line, idx) => <li key={idx}>{line}</li>)}
+                  </ul>
+                )}
               </div>
             ))}
-          </div>
+          </section>
         ) : null
       case 'gaps':
         return null
@@ -451,6 +616,9 @@ function PreviewModal({ profile, education, experience, projects, modules, onClo
         return null
     }
   }
+
+  const renderedSections = enabledModules.map(mod => renderModule(mod)).filter(Boolean)
+  const hasPreviewContent = hasHeaderContent || renderedSections.length > 0
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -462,18 +630,32 @@ function PreviewModal({ profile, education, experience, projects, modules, onClo
           </button>
         </div>
         <div className="preview-content">
-          <div className="preview-header">
-            <h2>{profile.full_name || '姓名'}</h2>
-            <div className="preview-contact">
-              {(profile.gender || profile.age) && <span>{profile.gender || ''}{profile.age ? ' · ' + profile.age + '岁' : ''}</span>}
-              {profile.phone && <span><Phone size={14} /> {profile.phone}</span>}
-              {profile.email && <span><Mail size={14} /> {profile.email}</span>}
-              {profile.wechat && <span>微信：{profile.wechat}</span>}
-              {profile.github && <span><FolderOpen size={14} /> {profile.github}</span>}
+          {!hasPreviewContent ? (
+            <div className="empty-state" style={{ minHeight: '320px' }}>
+              <FileText size={32} />
+              <p>暂无可预览内容</p>
+              <p style={{ fontSize: '13px', color: '#64748b' }}>先填写基本信息、教育背景、项目经历或自定义模块内容，再预览简历。</p>
             </div>
-          </div>
-
-          {enabledModules.map(mod => renderModule(mod))}
+          ) : (
+            <>
+              <div className="resume-preview-page">
+                <div className="resume-preview-header">
+                  <div>
+                    <h1>{asText(profile.full_name) || '简历预览'}</h1>
+                    <div className="resume-preview-contact-grid">
+                      {(hasText(profile.gender) || hasText(profile.age)) && <span>{asText(profile.gender) || ''}{hasText(profile.age) ? ' · ' + asText(profile.age) + '岁' : ''}</span>}
+                      {hasText(profile.phone) && <span>手机：{asText(profile.phone)}</span>}
+                      {hasText(profile.email) && <span>邮箱：{asText(profile.email)}</span>}
+                      {hasText(profile.wechat) && <span>微信：{asText(profile.wechat)}</span>}
+                      {hasText(profile.github) && <span>GitHub：{asText(profile.github)}</span>}
+                    </div>
+                  </div>
+                  {photoSrc ? <img className="resume-preview-photo" src={photoSrc} alt="个人照片" /> : null}
+                </div>
+                {renderedSections}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -510,6 +692,7 @@ export default function ResumeBuilder({ onToast }) {
   const [projects, setProjects] = useState([])
   const [photoPreview, setPhotoPreview] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [basicSaveStatus, setBasicSaveStatus] = useState('idle')
   const [modules, setModules] = useState([])
   const [showAddForm, setShowAddForm] = useState(false)
   const [editIndex, setEditIndex] = useState(null)
@@ -517,21 +700,24 @@ export default function ResumeBuilder({ onToast }) {
   const [dragIndex, setDragIndex] = useState(null)
   const [dragOverIndex, setDragOverIndex] = useState(null)
   const [isSavingModules, setIsSavingModules] = useState(false)
+  const [dataModuleSaveStatus, setDataModuleSaveStatus] = useState({})
   const [showPreview, setShowPreview] = useState(false)
   const [expandedSections, setExpandedSections] = useState({
-    basic: true,
+    basic: false,
     education: true,
     experience: true,
     projects: true,
-    modules: true
+    modules: false
   })
   const [validationErrors, setValidationErrors] = useState({})
+  const basicPhotoSrc = resolvePhotoSrc(profile, photoPreview)
 
   useEffect(() => {
     fetchJobs()
     fetchProviders()
     fetchProfile()
     fetchModules()
+    fetchResumeFiles()
   }, [])
 
   // Persist resumeFiles to localStorage
@@ -540,13 +726,18 @@ export default function ResumeBuilder({ onToast }) {
   }, [resumeFiles])
 
   const handleDeleteFile = async (file, index) => {
+    const displayName = file.fileName || file.name || file.path || '文件'
     try {
       await resumeAPI.deleteFile(file.path)
       setResumeFiles(prev => prev.filter((_, i) => i !== index))
-      showToast(onToast, `已删除：${file.fileName}`, 'success')
+      showToast(onToast, `已删除：${displayName}`, 'success')
     } catch (error) {
-      setResumeFiles(prev => prev.filter((_, i) => i !== index))
-      showToast(onToast, `文件已从列表移除`, 'success')
+      if (String(error.message || '').includes('File not found')) {
+        setResumeFiles(prev => prev.filter((_, i) => i !== index))
+        showToast(onToast, `磁盘文件不存在，已从列表移除：${displayName}`, 'info')
+        return
+      }
+      showToast(onToast, `删除失败：${displayName}`, 'error')
     }
   }
 
@@ -589,6 +780,15 @@ export default function ResumeBuilder({ onToast }) {
       }
     } catch (error) {
       showToast(onToast, '加载个人信息失败', 'error')
+    }
+  }
+
+  const fetchResumeFiles = async () => {
+    try {
+      const res = await resumeAPI.getFiles()
+      setResumeFiles(res.data || [])
+    } catch (error) {
+      console.error('Resume files fetch error:', error)
     }
   }
 
@@ -666,16 +866,11 @@ export default function ResumeBuilder({ onToast }) {
 
   const validateForm = () => {
     const errors = {}
-    
-    if (!profile.full_name.trim()) errors['full_name'] = '请输入姓名'
-    if (!profile.phone.trim()) {
-      errors['phone'] = '请输入联系电话'
-    } else if (!/^1[3-9]\d{9}$/.test(profile.phone.replace(/\s/g, ''))) {
+
+    if (profile.phone.trim() && !/^1[3-9]\d{9}$/.test(profile.phone.replace(/\s/g, ''))) {
       errors['phone'] = '请输入有效的手机号码'
     }
-    if (!profile.email.trim()) {
-      errors['email'] = '请输入邮箱'
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.email)) {
+    if (profile.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.email)) {
       errors['email'] = '请输入有效的邮箱地址'
     }
 
@@ -693,13 +888,23 @@ export default function ResumeBuilder({ onToast }) {
     })
 
     projects.forEach((item, index) => {
-      if (!item.name.trim()) errors[`projects[${index}].name`] = '请输入项目名称'
       if (!item.start_date) errors[`projects[${index}].start_date`] = '请选择开始时间'
-      if (!item.description.trim()) errors[`projects[${index}].description`] = '请输入项目描述'
       if (!item.responsibility.trim()) errors[`projects[${index}].responsibility`] = '请输入项目分工'
     })
 
     setValidationErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
+  const validateBasicInfo = () => {
+    const errors = {}
+    if (profile.phone.trim() && !/^1[3-9]\d{9}$/.test(profile.phone.replace(/\s/g, ''))) {
+      errors['phone'] = '请输入有效的手机号码'
+    }
+    if (profile.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.email)) {
+      errors['email'] = '请输入有效的邮箱地址'
+    }
+    if (Object.keys(errors).length > 0) setValidationErrors(errors)
     return Object.keys(errors).length === 0
   }
 
@@ -719,13 +924,34 @@ export default function ResumeBuilder({ onToast }) {
     reader.readAsDataURL(file)
   }
 
+  const handleDeletePhoto = async () => {
+    setIsSaving(true)
+    try {
+      const res = await resumeAPI.deletePhoto()
+      setProfile(prev => ({
+        ...prev,
+        ...res.data,
+        photoData: '',
+        photoName: ''
+      }))
+      setPhotoPreview('')
+      showToast(onToast, '个人照片已删除', 'success')
+    } catch (error) {
+      showToast(onToast, `删除照片失败：${error.message}`, 'error')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   const handleSaveProfile = async () => {
-    if (!validateForm()) {
-      showToast(onToast, '请填写必填项并确保格式正确', 'error')
+    if (!validateBasicInfo()) {
+      setBasicSaveStatus('error')
+      setTimeout(() => setBasicSaveStatus('idle'), 2000)
       return
     }
 
     setIsSaving(true)
+    setBasicSaveStatus('saving')
     try {
       const data = {
         ...profile,
@@ -736,8 +962,12 @@ export default function ResumeBuilder({ onToast }) {
       const res = await resumeAPI.saveProfile(data)
       setProfile(res.data)
       setPhotoPreview('')
+      setBasicSaveStatus('success')
+      setTimeout(() => setBasicSaveStatus('idle'), 2000)
       showToast(onToast, '个人信息已保存', 'success')
     } catch (error) {
+      setBasicSaveStatus('error')
+      setTimeout(() => setBasicSaveStatus('idle'), 2000)
       showToast(onToast, `保存失败：${error.message}`, 'error')
     } finally {
       setIsSaving(false)
@@ -765,10 +995,11 @@ export default function ResumeBuilder({ onToast }) {
     try {
       const res = await resumeAPI.addModule({ ...data, type: 'custom' })
       setModules(prev => [...prev, res.data])
-      setShowAddForm(false)
       showToast(onToast, `模块「${data.name}」已添加`, 'success')
+      return true
     } catch (error) {
       showToast(onToast, `添加失败：${error.message}`, 'error')
+      return false
     }
   }
 
@@ -786,10 +1017,11 @@ export default function ResumeBuilder({ onToast }) {
       await resumeAPI.updateModule(mod.id, data)
       const updated = modules.map((m, i) => i === editIndex ? { ...m, ...data } : m)
       setModules(updated)
-      setEditIndex(null)
       showToast(onToast, `模块「${data.name}」已更新`, 'success')
+      return true
     } catch (error) {
       showToast(onToast, `更新失败：${error.message}`, 'error')
+      return false
     }
   }
 
@@ -826,20 +1058,30 @@ export default function ResumeBuilder({ onToast }) {
     }
   }, [profile, education, experience, projects])
 
-  const handleSaveDataModule = async () => {
+  const handleSaveDataModule = async (moduleId) => {
     setIsSaving(true)
+    setDataModuleSaveStatus(prev => ({ ...prev, [moduleId]: 'saving' }))
     try {
-      const data = {
-        ...profile,
-        education,
-        experience,
-        projects
-      }
-      const res = await resumeAPI.saveProfile(data)
+      const payload = moduleId === 'education'
+        ? { education }
+        : moduleId === 'experience'
+          ? { experience }
+          : { projects }
+      const res = await resumeAPI.saveModuleData(moduleId, payload)
       setProfile(res.data)
-      setEditingDataModule(null)
+      if (Array.isArray(res.data.education)) setEducation(res.data.education)
+      if (Array.isArray(res.data.experience)) setExperience(res.data.experience)
+      if (Array.isArray(res.data.projects)) setProjects(res.data.projects)
+      setDataModuleSaveStatus(prev => ({ ...prev, [moduleId]: 'success' }))
+      setTimeout(() => {
+        setDataModuleSaveStatus(prev => ({ ...prev, [moduleId]: 'idle' }))
+      }, 2000)
       showToast(onToast, '数据已保存', 'success')
     } catch (error) {
+      setDataModuleSaveStatus(prev => ({ ...prev, [moduleId]: 'error' }))
+      setTimeout(() => {
+        setDataModuleSaveStatus(prev => ({ ...prev, [moduleId]: 'idle' }))
+      }, 2000)
       showToast(onToast, `保存失败：${error.message}`, 'error')
     } finally {
       setIsSaving(false)
@@ -910,6 +1152,29 @@ export default function ResumeBuilder({ onToast }) {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }))
   }
 
+  const hasPreviewableContent = (data) => {
+    const hasText = (value) => {
+      if (Array.isArray(value)) return value.some(item => String(item || '').trim())
+      return String(value || '').trim().length > 0
+    }
+    const hasBasic = Boolean(
+      hasText(data.full_name) ||
+      hasText(data.gender) ||
+      hasText(data.age) ||
+      hasText(data.phone) ||
+      hasText(data.email) ||
+      hasText(data.wechat) ||
+      hasText(data.github) ||
+      hasText(data.summary) ||
+      hasText(data.skills)
+    )
+    const hasEducation = (data.education || []).some(item => hasText(item.school) || hasText(item.major) || hasText(item.degree) || hasText(item.description) || hasText(item.start_date) || hasText(item.end_date))
+    const hasExperience = (data.experience || []).some(item => hasText(item.company) || hasText(item.position) || hasText(item.role) || hasText(item.description) || hasText(item.start_date) || hasText(item.end_date))
+    const hasProjects = (data.projects || []).some(item => hasText(item.name) || hasText(item.role) || hasText(item.tech_stack) || hasText(item.description) || hasText(item.start_date) || hasText(item.end_date))
+    const hasCustomModule = (data.modules || []).some(mod => mod.enabled && mod.type === 'custom' && hasText(mod.content))
+    return hasBasic || hasEducation || hasExperience || hasProjects || hasCustomModule
+  }
+
   return (
     <>
       <div className="page-header">
@@ -921,12 +1186,9 @@ export default function ResumeBuilder({ onToast }) {
         <SectionHeader
           icon={User}
           title="基本信息"
-          description="用于后续 Word/PDF 简历生成，优先级高于 cv.md 中的联系方式"
-          actions={
-            <button className="btn btn-primary btn-sm" onClick={() => toggleSection('basic')}>
-              {expandedSections.basic ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-            </button>
-          }
+          description="用于后续 Word/PDF 简历生成"
+          onToggle={() => toggleSection('basic')}
+          isExpanded={expandedSections.basic}
         />
         
         {expandedSections.basic && (
@@ -940,7 +1202,6 @@ export default function ResumeBuilder({ onToast }) {
                     value={profile.full_name}
                     onChange={updateProfile}
                     placeholder="请输入姓名"
-                    required
                     error={validationErrors.full_name}
                   />
                   <FormInput
@@ -972,7 +1233,6 @@ export default function ResumeBuilder({ onToast }) {
                     value={profile.phone}
                     onChange={updateProfile}
                     placeholder="请输入手机号码"
-                    required
                     error={validationErrors.phone}
                   />
                   <FormInput
@@ -981,7 +1241,6 @@ export default function ResumeBuilder({ onToast }) {
                     value={profile.email}
                     onChange={updateProfile}
                     placeholder="请输入邮箱地址"
-                    required
                     error={validationErrors.email}
                   />
                   <FormInput
@@ -995,13 +1254,21 @@ export default function ResumeBuilder({ onToast }) {
               </div>
               <div className="photo-section">
                 <div className="photo-preview">
-                  {photoPreview ? <img src={photoPreview} alt="预览" /> : profile.photo_path ? <span>已上传照片</span> : <span>个人照片</span>}
+                  {basicPhotoSrc ? <img src={basicPhotoSrc} alt="个人照片" /> : <span>个人照片</span>}
                 </div>
                 <label className="btn btn-secondary btn-block">
                   <Upload size={14} style={{ marginRight: '6px' }} />
-                  上传照片
+                  {basicPhotoSrc ? '更换照片' : '上传照片'}
                   <input type="file" accept="image/png,image/jpeg" onChange={handlePhotoChange} style={{ display: 'none' }} />
                 </label>
+                {basicPhotoSrc && (
+                  <button className="btn btn-danger btn-block" style={{ marginTop: '8px' }} onClick={handleDeletePhoto} disabled={isSaving}>
+                    删除照片
+                  </button>
+                )}
+                <div style={{ marginTop: '8px', fontSize: '12px', color: '#64748b', textAlign: 'center' }}>
+                  支持 PNG/JPG，保存基本信息后会用于预览和简历导出
+                </div>
               </div>
             </div>
             <FormTextarea
@@ -1012,6 +1279,35 @@ export default function ResumeBuilder({ onToast }) {
               rows={4}
               placeholder="请简要介绍自己的核心竞争力、专业技能和职业目标（建议100-200字）"
             />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+              <button
+                className={`btn btn-sm${basicSaveStatus === 'success' ? ' btn-success' : basicSaveStatus === 'error' ? ' btn-danger' : ' btn-primary'}`}
+                onClick={handleSaveProfile}
+                disabled={isSaving || basicSaveStatus === 'saving'}
+              >
+                {basicSaveStatus === 'success' ? (
+                  <>
+                    <CheckCircle size={14} style={{ marginRight: '4px' }} />
+                    已保存
+                  </>
+                ) : basicSaveStatus === 'error' ? (
+                  <>
+                    <X size={14} style={{ marginRight: '4px' }} />
+                    校验失败
+                  </>
+                ) : isSaving || basicSaveStatus === 'saving' ? (
+                  <>
+                    <Save size={14} style={{ marginRight: '4px' }} />
+                    保存中...
+                  </>
+                ) : (
+                  <>
+                    <Save size={14} style={{ marginRight: '4px' }} />
+                    保存基本信息
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -1021,15 +1317,14 @@ export default function ResumeBuilder({ onToast }) {
           icon={GripVertical}
           title="简历模块管理"
           description="拖拽排序模块顺序，控制简历输出结构。内置模块可显示/隐藏，自定义模块可编辑内容"
+          onToggle={() => toggleSection('modules')}
+          isExpanded={expandedSections.modules}
           actions={
             <>
               {isSavingModules && <span className="sync-status">同步中...</span>}
-              <button className="btn btn-primary btn-sm" onClick={() => setShowAddForm(true)} disabled={showAddForm}>
+              <button className="btn btn-primary btn-sm" onClick={(e) => { e.stopPropagation(); setShowAddForm(true) }} disabled={showAddForm}>
                 <Plus size={14} style={{ marginRight: '4px' }} />
                 添加自定义模块
-              </button>
-              <button className="btn btn-secondary btn-sm" onClick={() => toggleSection('modules')}>
-                {expandedSections.modules ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
               </button>
             </>
           }
@@ -1152,6 +1447,19 @@ export default function ResumeBuilder({ onToast }) {
                       )}
                       
                       <div className="editor-footer">
+                        <button
+                          className="btn btn-primary"
+                          onClick={() => handleSaveDataModule(mod.id)}
+                          disabled={dataModuleSaveStatus[mod.id] === 'saving'}
+                        >
+                          {dataModuleSaveStatus[mod.id] === 'saving'
+                            ? '保存中...'
+                            : dataModuleSaveStatus[mod.id] === 'success'
+                              ? '✓ 已保存'
+                              : dataModuleSaveStatus[mod.id] === 'error'
+                                ? '✕ 保存失败'
+                                : '保存当前模块'}
+                        </button>
                         <button className="btn btn-secondary" onClick={() => setEditingDataModule(null)}>
                           关闭
                         </button>
@@ -1207,13 +1515,17 @@ export default function ResumeBuilder({ onToast }) {
               </div>
             </button>
             <button className="btn btn-secondary btn-large" onClick={async () => {
-              const res = await resumeAPI.getProfile()
-              const data = res.data
-              setProfile(data)
-              if (data.education) setEducation(data.education)
-              if (data.experience) setExperience(data.experience)
-              if (data.projects) setProjects(data.projects)
-              if (data.modules) setModules(data.modules)
+              const data = {
+                ...profile,
+                education,
+                experience,
+                projects,
+                modules
+              }
+              if (!hasPreviewableContent(data)) {
+                showToast(onToast, '暂无可预览内容，请先填写至少一项简历信息', 'info')
+                return
+              }
               setShowPreview(true)
             }}>
               <Eye size={20} className="btn-icon" />
@@ -1262,7 +1574,7 @@ export default function ResumeBuilder({ onToast }) {
           <ul className="file-list">
             {resumeFiles.map((file, index) => (
               <li key={`${file.path}-${index}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                <a href={`/${file.path}`} target="_blank" rel="noreferrer" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.fileName}</a>
+                <a href={`/${file.path}`} target="_blank" rel="noreferrer" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.fileName || file.name || file.path}</a>
                 <button onClick={() => handleDeleteFile(file, index)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px', borderRadius: '4px', display: 'flex', alignItems: 'center' }} title="删除文件">
                   <Trash2 size={16} />
                 </button>
@@ -1278,7 +1590,7 @@ export default function ResumeBuilder({ onToast }) {
         </div>
         <ul className="guide-list">
           <li><CheckCircle size={18} className="check-icon" />在各信息模块中填写详细的个人信息，系统会自动保存到简历模板</li>
-          <li><CheckCircle size={18} className="check-icon" />教育背景、工作经历、项目经验支持添加多条记录，按时间倒序排列</li>
+          <li><CheckCircle size={18} className="check-icon" />教育背景、工作经历、项目经验支持添加多条记录，按时间顺序排列</li>
           <li><CheckCircle size={18} className="check-icon" />在「简历模块管理」中拖拽排序、显示/隐藏模块，控制简历输出结构</li>
           <li><CheckCircle size={18} className="check-icon" />点击「预览简历」查看填写效果，确认无误后再生成正式简历</li>
           <li><CheckCircle size={18} className="check-icon" />选择一个已评估的岗位，系统会根据岗位要求定制简历内容</li>
@@ -1292,6 +1604,7 @@ export default function ResumeBuilder({ onToast }) {
           experience={experience}
           projects={projects}
           modules={modules}
+          photoPreview={photoPreview}
           onClose={() => setShowPreview(false)}
         />
       )}
