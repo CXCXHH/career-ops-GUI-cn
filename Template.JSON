@@ -1,0 +1,94 @@
+{
+  "candidate": {
+    "full_name": "张三",
+    "gender": "男",
+    "age": "23",
+    "email": "zhangsan@example.com",
+    "phone": "13800138000",
+    "github": "https://github.com/zhangsan",
+    "wechat": "zhangsan_wechat",
+    "portfolio_url": "https://zhangsan.dev",
+    "summary": "自动化专业本科，熟悉 C 语言、STM32、PLC、Modbus 和基础控制系统开发。",
+    "skills": [
+      "C语言",
+      "STM32",
+      "PLC",
+      "Modbus",
+      "FreeRTOS",
+      "AutoCAD"
+    ],
+    "education": [
+      {
+        "school": "湖南工程学院",
+        "degree": "本科",
+        "major": "自动化",
+        "start_date": "2021-09",
+        "end_date": "2025-06",
+        "gpa": "3.8/4.0",
+        "description": "主修自动控制原理、单片机原理、电力电子技术，获校级二等奖学金。"
+      }
+    ],
+    "experience": [
+      {
+        "company": "某自动化科技有限公司",
+        "position": "嵌入式实习生",
+        "start_date": "2024-07",
+        "end_date": "2024-10",
+        "description": "参与产线数据采集终端开发，负责串口通信、寄存器映射和现场联调。",
+        "role": "核心开发"
+      }
+    ],
+    "projects": [
+      {
+        "name": "基于 STM32 的电机控制系统",
+        "role": "项目负责人",
+        "start_date": "2024-03",
+        "end_date": "2024-06",
+        "description": "完成电机调速控制、按键交互、OLED 显示和故障保护逻辑，实现稳定闭环控制。",
+        "tech_stack": "C语言、STM32、PID、FreeRTOS"
+      }
+    ]
+  },
+  "target": {
+    "roles": [
+      "嵌入式软件工程师",
+      "自动化工程师",
+      "PLC工程师"
+    ],
+    "cities": [
+      "长沙",
+      "深圳",
+      "全国"
+    ],
+    "levels": [
+      "校招/应届",
+      "初级"
+    ],
+    "enterprise_types": [
+      "国企央企",
+      "民营名企",
+      "外企"
+    ],
+    "positive_keywords": [
+      "嵌入式",
+      "STM32",
+      "PLC",
+      "自动化",
+      "工控",
+      "电气工程师"
+    ],
+    "negative_keywords": [
+      "销售",
+      "客服",
+      "培训",
+      "保险",
+      "中介"
+    ],
+    "companies": [
+      "汇川技术",
+      "西门子",
+      "大疆",
+      "国家电网"
+    ]
+  }
+}

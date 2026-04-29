@@ -229,6 +229,63 @@ npm run gui:dev
 
 你只需要按自己的信息填写即可。
 
+### 3.1 使用 JSON 模板导入简历信息
+
+如果你不想在“首次使用向导”里手动逐项填写，也可以先准备一个 JSON 文件，再按这个结构整理你的简历事实和求职目标。
+
+项目根目录已提供模板文件：[Template.JSON](</d:/career-ops/career-ops-GUI-cn/Template.JSON>)。
+
+导入 JSON 时，顶层必须是两个对象：
+
+- `candidate`：候选人简历事实
+- `target`：求职目标与搜索偏好
+
+最小可用结构如下：
+
+```json
+{
+  "candidate": {
+    "full_name": "张三",
+    "summary": "一句话定位",
+    "skills": ["C语言", "STM32"],
+    "education": [],
+    "experience": [],
+    "projects": []
+  },
+  "target": {
+    "roles": ["嵌入式软件工程师"],
+    "cities": ["深圳"],
+    "levels": ["校招/应届"],
+    "enterprise_types": ["不限"],
+    "positive_keywords": ["嵌入式", "STM32"],
+    "negative_keywords": ["销售", "客服"],
+    "companies": ["汇川技术"]
+  }
+}
+```
+
+字段说明：
+
+- `candidate.full_name / gender / age / email / phone / github / wechat / portfolio_url / summary`：基础信息
+- `candidate.skills`：技能关键词，推荐写成数组；如果你自己生成 JSON，也可以写成逗号或换行分隔的字符串
+- `candidate.education`：教育经历数组，每项包含 `school / degree / major / start_date / end_date / gpa / description`
+- `candidate.experience`：工作或实习经历数组，每项包含 `company / position / start_date / end_date / description / role`
+- `candidate.projects`：项目经历数组，每项包含 `name / role / start_date / end_date / description / tech_stack`
+- `target.roles`：目标岗位
+- `target.cities`：目标城市
+- `target.levels`：岗位级别，例如 `实习`、`校招/应届`、`初级`、`中级`、`高级`
+- `target.enterprise_types`：企业类型，例如 `国企央企`、`民营名企`、`外企`、`不限`
+- `target.positive_keywords / negative_keywords / companies`：后续岗位搜索和筛选时使用的关键词、排除词、重点公司
+
+填写建议：
+
+- 日期统一用 `YYYY-MM`，例如 `2024-07`
+- 仍在进行中的经历，`end_date` 可写 `present`
+- 推荐优先使用数组，兼容性最好
+- `skills`、`roles`、`cities`、`levels`、`enterprise_types`、`positive_keywords`、`negative_keywords`、`companies` 这些字段即使写成字符串，系统也会按逗号、顿号、分号或换行自动拆分
+
+这个 JSON 结构与项目实际导入逻辑一致，保存后可以作为你的标准简历事实模板长期复用；系统后续会据此生成 `cv.md`、`config/profile.yml`、`portals.yml` 和 `data/job-radar/resume-profile.json`。
+
 ### 4. 开始使用
 
 推荐顺序：
