@@ -4,6 +4,16 @@
 
 这个项目基于开源项目 `career-ops` 演化而来，但当前仓库已经裁剪为以 GUI 为核心的中国区使用版本，保留当前运行所需的最小结构，并重写了初始化与健康检查体验。
 
+<img width="2539" height="1382" alt="image" src="https://github.com/user-attachments/assets/b96dd9bc-675b-4902-bbc3-4b8e9184ec89" />
+
+
+<img width="2536" height="1394" alt="image" src="https://github.com/user-attachments/assets/b0ed6190-2799-4d39-b5bf-a183c03085b4" />
+
+
+<img width="2545" height="1403" alt="image" src="https://github.com/user-attachments/assets/2ae8f5e2-a987-4623-8142-3ce0fe5cc699" />
+
+
+
 ## 主要功能
 
 - 岗位列表：导入岗位、提取 JD、AI 优化 JD、AI 评分、批量操作
