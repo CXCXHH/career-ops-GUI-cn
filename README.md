@@ -94,9 +94,9 @@ cd career-ops-gui-cn
 如果你希望手动安装：
 
 ```bash
-npm install --registry=https://mirrors.tuna.tsinghua.edu.cn/npm/
+npm install --registry=https://registry.npmmirror.com/
 cd gui
-npm install --registry=https://mirrors.tuna.tsinghua.edu.cn/npm/
+npm install --registry=https://registry.npmmirror.com/
 cd ..
 ```
 
@@ -631,10 +631,10 @@ npm run gui:build
 
 ### npm 依赖安装
 
-自动使用清华镜像：
+自动使用阿里源：
 
 ```text
-https://mirrors.tuna.tsinghua.edu.cn/npm/
+https://registry.npmmirror.com/
 ```
 
 用于：

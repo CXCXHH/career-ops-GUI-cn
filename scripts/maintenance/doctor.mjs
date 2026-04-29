@@ -12,7 +12,7 @@ import { spawnSync } from 'child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, '..', '..');
-const TUNA_NPM_REGISTRY = 'https://mirrors.tuna.tsinghua.edu.cn/npm/';
+const ALIYUN_NPM_REGISTRY = 'https://registry.npmmirror.com/';
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const npxCommand = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 
@@ -42,10 +42,10 @@ function runCommand(command, args, cwd, extraEnv = {}) {
 function installNpmDependencies(cwd, label) {
   return runCommand(
     npmCommand,
-    ['install', '--registry', TUNA_NPM_REGISTRY, '--no-fund', '--no-audit'],
+    ['install', '--registry', ALIYUN_NPM_REGISTRY, '--no-fund', '--no-audit'],
     cwd,
     {
-      npm_config_registry: TUNA_NPM_REGISTRY,
+      npm_config_registry: ALIYUN_NPM_REGISTRY,
     }
   );
 }
@@ -94,14 +94,14 @@ function checkDependencies() {
   }
   const installResult = installNpmDependencies(projectRoot, 'root');
   if (installResult.pass && existsSync(join(projectRoot, 'node_modules'))) {
-    return { pass: true, label: 'Root dependencies installed (auto-installed via Tsinghua mirror)' };
+    return { pass: true, label: 'Root dependencies installed (auto-installed via Aliyun mirror)' };
   }
   return {
     pass: false,
     label: 'Root dependencies not installed',
     fix: [
       '健康检查已尝试自动安装，但未成功。',
-      `Run: npm install --registry=${TUNA_NPM_REGISTRY}`,
+      `Run: npm install --registry=${ALIYUN_NPM_REGISTRY}`,
       installResult.output || '请检查网络、Node/npm 环境和镜像源可用性。',
     ],
   };
@@ -114,14 +114,14 @@ function checkGuiDependencies() {
   }
   const installResult = installNpmDependencies(guiRoot, 'gui');
   if (installResult.pass && existsSync(join(guiRoot, 'node_modules'))) {
-    return { pass: true, label: 'GUI dependencies installed (auto-installed via Tsinghua mirror)' };
+    return { pass: true, label: 'GUI dependencies installed (auto-installed via Aliyun mirror)' };
   }
   return {
     pass: false,
     label: 'GUI dependencies not installed',
     fix: [
       '健康检查已尝试自动安装，但未成功。',
-      `Run: cd gui && npm install --registry=${TUNA_NPM_REGISTRY}`,
+      `Run: cd gui && npm install --registry=${ALIYUN_NPM_REGISTRY}`,
       installResult.output || '请检查网络、Node/npm 环境和镜像源可用性。',
     ],
   };
