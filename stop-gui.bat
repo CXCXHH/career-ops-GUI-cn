@@ -1,20 +1,20 @@
 @echo off
 setlocal
-title Career-Ops-GUI-cn Restart
+title Career-Ops-GUI-cn Stop
 
 set "ROOT=%~dp0"
 cd /d "%ROOT%"
 
 echo ==============================================
-echo       Career-Ops-GUI-cn One-Click Restart
+echo         Career-Ops-GUI-cn One-Click Stop
 echo ==============================================
 echo.
 
-echo [1/4] Closing project windows...
+echo [1/2] Closing project windows...
 taskkill /F /T /FI "WINDOWTITLE eq Career-Ops-GUI-cn API*" >nul 2>nul
 taskkill /F /T /FI "WINDOWTITLE eq Career-Ops-GUI-cn Frontend*" >nul 2>nul
 
-echo [2/4] Killing processes on ports 3001 and 5173...
+echo [2/2] Killing processes on ports 3001 and 5173...
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$ports = @(3001,5173); " ^
   "$procIds = Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | " ^
@@ -26,9 +26,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
 
 timeout /t 2 /nobreak >nul
 
-echo [3/4] Clearing frontend cache...
-if exist "gui\node_modules\.vite" rmdir /s /q "gui\node_modules\.vite"
-
-echo [4/4] Starting project again...
-call "%ROOT%start-gui.bat"
-exit /b %errorlevel%
+echo.
+echo ==============================================
+echo Project services have been stopped.
+echo Frontend port: 5173
+echo Backend port : 3001
+echo ==============================================
+echo.
+pause

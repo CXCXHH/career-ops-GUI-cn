@@ -1,22 +1,13 @@
 {
-  "name": "career-ops",
+  "name": "career-ops-gui-cn",
   "version": "1.0.0",
-  "description": "AI-powered job search pipeline built on Claude Code",
+  "description": "Career-Ops-GUI-cn: AI-driven Chinese job search GUI for resume building, job tracking, and interview prep",
   "scripts": {
     "doctor": "node scripts/maintenance/doctor.mjs",
     "verify": "node scripts/core/verify-pipeline.mjs",
-    "normalize": "node scripts/core/normalize-statuses.mjs",
-    "dedup": "node scripts/core/dedup-tracker.mjs",
     "merge": "node scripts/core/merge-tracker.mjs",
     "pdf": "node scripts/cv/generate-pdf.mjs",
     "sync-check": "node scripts/cv/cv-sync-check.mjs",
-    "update:check": "node scripts/maintenance/update-system.mjs check",
-    "update": "node scripts/maintenance/update-system.mjs apply",
-    "rollback": "node scripts/maintenance/update-system.mjs rollback",
-    "liveness": "node scripts/jobs/check-liveness.mjs",
-    "scan": "node scripts/jobs/scan.mjs",
-    "gemini:eval": "node scripts/jobs/gemini-eval.mjs",
-    "test:all": "node scripts/maintenance/test-all.mjs",
     "api": "node gui/server.mjs",
     "gui:dev": "cd gui && npm run dev",
     "gui:build": "cd gui && npm run build",
@@ -25,16 +16,12 @@
   "keywords": [
     "ai",
     "job-search",
-    "claude-code",
+    "gui",
+    "react",
     "career",
-    "automation"
+    "resume",
+    "interview"
   ],
-  "author": "Santiago Fernández de Valderrama <hi@santifer.io> (https://santifer.io)",
-  "homepage": "https://santifer.io",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/santifer/career-ops"
-  },
   "license": "MIT",
   "dependencies": {
     "@google/generative-ai": "^0.21.0",

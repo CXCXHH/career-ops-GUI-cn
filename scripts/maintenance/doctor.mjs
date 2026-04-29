@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * doctor.mjs — Setup validation for career-ops
+ * doctor.mjs — Setup validation for Career-Ops-GUI-cn
  * Checks all prerequisites and prints a pass/fail checklist.
  */
 
@@ -249,7 +249,7 @@ function checkAutoDir(name) {
 }
 
 async function main() {
-  console.log('\ncareer-ops doctor');
+  console.log('\nCareer-Ops-GUI-cn doctor');
   console.log('================\n');
 
   const checks = [
@@ -286,9 +286,8 @@ async function main() {
     console.log(`Result: ${failures} issue${failures === 1 ? '' : 's'} found. Fix them and run \`npm run doctor\` again.`);
     process.exit(1);
   } else {
-    console.log('Result: All checks passed. You\'re ready to go! Run `claude` to start.');
-    console.log('');
-    console.log('Join the community: https://discord.gg/8pRpHETxa4');
+    console.log('Result: All checks passed. You are ready to start the GUI project.');
+    console.log('Suggested next steps: run `npm run api` and `npm run gui:dev`.');
     process.exit(0);
   }
 }

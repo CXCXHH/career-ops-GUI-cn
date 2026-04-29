@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * cv-sync-check.mjs — Validates that the career-ops setup is consistent.
+ * cv-sync-check.mjs — Validates that the Career-Ops-GUI-cn setup is consistent.
  *
  * Checks:
  * 1. cv.md exists
@@ -88,7 +88,7 @@ if (existsSync(digestPath)) {
 }
 
 // Output results
-console.log('\n=== career-ops sync check ===\n');
+console.log('\n=== Career-Ops-GUI-cn sync check ===\n');
 
 if (errors.length === 0 && warnings.length === 0) {
   console.log('All checks passed.');

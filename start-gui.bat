@@ -1,14 +1,65 @@
 @echo off
-chcp 65001 >nul
+setlocal
+title Career-Ops-GUI-cn Start
 
-echo 正在启动 API 服务器...
-start "API Server" /min node gui/server.mjs
+set "ROOT=%~dp0"
+cd /d "%ROOT%"
+
+echo ==============================================
+echo        Career-Ops-GUI-cn One-Click Start
+echo ==============================================
+echo.
+
+where node >nul 2>nul
+if errorlevel 1 (
+  echo [ERROR] Node.js was not found.
+  echo Please install Node.js 18 or later first:
+  echo https://nodejs.org/
+  echo.
+  pause
+  exit /b 1
+)
+
+where npm >nul 2>nul
+if errorlevel 1 (
+  echo [ERROR] npm was not found.
+  echo Please make sure Node.js is installed correctly.
+  echo.
+  pause
+  exit /b 1
+)
+
+echo [1/4] Running doctor check...
+call npm run doctor
+if errorlevel 1 (
+  echo.
+  echo [ERROR] Doctor check failed.
+  echo Please read the messages above and try again.
+  echo.
+  pause
+  exit /b 1
+)
+
+echo.
+echo [2/4] Starting API server...
+start "Career-Ops-GUI-cn API" /min cmd /k "cd /d ""%ROOT%"" && node gui/server.mjs"
 
 timeout /t 3 /nobreak >nul
 
-echo 正在启动前端服务器...
-start "Frontend Server" /min cmd /k "cd gui && npm run dev"
+echo [3/4] Starting frontend server...
+start "Career-Ops-GUI-cn Frontend" /min cmd /k "cd /d ""%ROOT%gui"" && npm run dev"
 
 timeout /t 5 /nobreak >nul
 
-start http://localhost:5173
+echo [4/4] Opening browser...
+start "" "http://localhost:5173"
+
+echo.
+echo ==============================================
+echo Start finished.
+echo Frontend: http://localhost:5173
+echo Backend : http://localhost:3001
+echo If the page is not ready yet, wait a few seconds and refresh.
+echo ==============================================
+echo.
+pause

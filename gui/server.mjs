@@ -108,7 +108,7 @@ function writeEnvFile(updates) {
   const envPath = `${PROJECT_ROOT}/.env`
   const existingContent = existsSync(envPath)
     ? readFileSync(envPath, 'utf-8')
-    : '# career-ops local environment\n'
+    : '# Career-Ops-GUI-cn local environment\n'
   const lines = existingContent.split('\n')
   const remaining = { ...updates }
   const updatedLines = lines.map((line) => {
@@ -743,7 +743,7 @@ function buildEvaluationPrompt(job) {
     jobDescription
   ].join('\n')
 
-  return `你是 career-ops 的求职评分器。请严格基于候选人材料、岗位 JD 和 career-ops 规则评分，不要编造经历。
+  return `你是 Career-Ops-GUI-cn 的求职评分器。请严格基于候选人材料、岗位 JD 和系统规则评分，不要编造经历。
 
 必须只返回一个 JSON 对象，不要 Markdown，不要代码块。JSON schema:
 {
@@ -785,10 +785,10 @@ ${profileMode}
 ## Proof Points
 ${proofPoints}
 
-## career-ops Shared Rules
+## Shared Rules
 ${sharedMode}
 
-## career-ops Offer Evaluation Rules
+## Offer Evaluation Rules
 ${ofertaMode}
 
 ## Job Description
