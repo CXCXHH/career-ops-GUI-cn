@@ -6,13 +6,9 @@
 
 <img width="2539" height="1382" alt="image" src="https://github.com/user-attachments/assets/b96dd9bc-675b-4902-bbc3-4b8e9184ec89" />
 
-
 <img width="2536" height="1394" alt="image" src="https://github.com/user-attachments/assets/b0ed6190-2799-4d39-b5bf-a183c03085b4" />
 
-
 <img width="2545" height="1403" alt="image" src="https://github.com/user-attachments/assets/2ae8f5e2-a987-4623-8142-3ce0fe5cc699" />
-
-
 
 ## 主要功能
 
@@ -50,7 +46,7 @@
 - 优先复用本机 Chrome / Edge
 - 仅在缺失系统浏览器时安装 Playwright Chromium
 - 自动生成 `cv.md`、`config/profile.yml`、`portals.yml`
-- npm 安装默认使用清华镜像源
+- npm 安装默认使用阿里云镜像源
 
 ## 目录结构
 
@@ -68,6 +64,7 @@ Career-Ops-GUI-cn/
 ├── interview-prep/            # 面试准备结果
 ├── jds/                       # 保存的 JD 文本
 └── tmp/                       # 运行临时文件
+└── Template.JSON/             # JSON模板
 ```
 
 ## 环境要求
@@ -181,9 +178,6 @@ npm run gui:dev
 - 页面打不开但端口还被旧进程占用
 - 修改配置后想快速重启
 
-> 注意：
-> `restart-gui.bat` 只会尝试停止当前项目常用端口，不会像旧版本那样直接杀掉所有 `node.exe`，因此对小白更安全。
-
 #### `stop-gui.bat`
 
 双击 [stop-gui.bat](d:\career-ops\career-ops-main\stop-gui.bat) 后会自动执行：
@@ -290,12 +284,11 @@ npm run gui:dev
 
 推荐顺序：
 
-1. 先在“公司库”维护目标公司
-2. 在“岗位列表”导入或录入岗位
-3. 对岗位执行 AI 优化 JD 和 AI 评分
-4. 在“简历生成”页面维护简历并导出 PDF
-5. 将岗位加入“投递追踪”
-6. 对关键岗位生成“面试准备”
+1. 先在“岗位列表”导入或录入岗位
+2. 对岗位执行 AI 优化 JD 和 AI 评分
+3. 在“简历生成”页面维护简历并导出 PDF
+4. 将岗位加入“投递追踪”
+5. 对关键岗位生成“面试准备”
 
 ## GUI 界面详细说明
 
@@ -572,13 +565,12 @@ npm run gui:dev
 1. 设置：运行健康检查并安装依赖
 2. 设置：配置 DeepSeek 或 豆包 API
 3. 首次使用向导 / 简历生成：补全个人简历资料
-4. 公司库：维护目标公司
-5. 岗位发现：搜索并导入候选岗位
-6. 候选区：筛一遍低质量岗位
-7. 岗位列表：提取 JD、优化 JD、AI 评分
-8. 简历生成：针对目标岗位生成 PDF
-9. 投递追踪：加入并维护投递状态
-10. 面试准备：对关键岗位生成面试材料
+4. 岗位发现：使用自己的AI搜索填写 JSON 模板搜索并导入候选岗位
+5. 候选区：筛一遍低质量岗位
+6. 岗位列表：提取 JD、优化 JD、AI 评分
+7. 简历生成：针对目标岗位生成 PDF
+8. 投递追踪：加入并维护投递状态
+9. 面试准备：对关键岗位生成面试材料
 
 如果你已经有明确岗位 JD，也可以走更短路径：
 
