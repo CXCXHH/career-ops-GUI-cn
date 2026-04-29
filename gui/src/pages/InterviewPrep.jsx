@@ -110,9 +110,9 @@ export default function InterviewPrep({ onToast }) {
   const [selectedJob, setSelectedJob] = useState('')
   const [interviewPrep, setInterviewPrep] = useState(null)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [generationElapsed, setGenerationElapsed] = useState(0)
   const [completedQuestions, setCompletedQuestions] = useState(new Set())
   const [activeTab, setActiveTab] = useState('overview')
-  const [aiLabel, setAiLabel] = useState('AI')
   const [selectedProvider, setSelectedProvider] = useState('deepseek')
   const [selectedAnalyzedJob, setSelectedAnalyzedJob] = useState('')
   const [analyzedJobs, setAnalyzedJobs] = useState([])
@@ -127,6 +127,17 @@ export default function InterviewPrep({ onToast }) {
     refreshAnalyzedJobs()
   }, [jobs])
 
+  useEffect(() => {
+    if (!isGenerating) {
+      setGenerationElapsed(0)
+      return
+    }
+    const timer = setInterval(() => {
+      setGenerationElapsed(prev => prev + 1)
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [isGenerating])
+
   const refreshAnalyzedJobs = () => {
     const ids = getAnalyzedJobIds()
     const matched = jobs.filter(j => ids.includes(j.id))
@@ -138,10 +149,16 @@ export default function InterviewPrep({ onToast }) {
       const res = await aiAPI.getProviders()
       const configured = (res.data || []).find(p => p.configured)
       if (configured) {
-        setAiLabel(configured.label || 'AI')
         setSelectedProvider(configured.id || 'deepseek')
       }
     } catch (_) { /* keep default */ }
+  }
+
+  const generationHint = () => {
+    if (generationElapsed < 15) return '通常约 20-40 秒'
+    if (generationElapsed < 40) return '通常约 30-60 秒'
+    if (generationElapsed < 70) return '本次耗时偏长，通常在 1 分钟内完成'
+    return '已超过常见耗时，请继续等待，本次任务可能较复杂'
   }
 
   const fetchJobs = async () => {
@@ -251,7 +268,12 @@ export default function InterviewPrep({ onToast }) {
 
   const allQuestions = [
     ...(interviewPrep?.technical_questions || []).map((q, i) => ({ ...q, _type: 'tech', _idx: i })),
-    ...(interviewPrep?.behavioral_questions || []).map((q, i) => ({ ...q, _type: 'behavioral', _idx: i + (interviewPrep?.technical_questions || []).length }))
+    ...(interviewPrep?.project_deep_dive_questions || []).map((q, i) => ({ ...q, _type: 'project', _idx: i + (interviewPrep?.technical_questions || []).length })),
+    ...(interviewPrep?.behavioral_questions || []).map((q, i) => ({
+      ...q,
+      _type: 'behavioral',
+      _idx: i + (interviewPrep?.technical_questions || []).length + (interviewPrep?.project_deep_dive_questions || []).length
+    }))
   ]
 
   const totalQ = allQuestions.length
@@ -308,8 +330,10 @@ export default function InterviewPrep({ onToast }) {
         {isGenerating && (
           <div className="empty-state">
             <div className="spinner" style={{ margin: '0 auto' }}></div>
-            <p>{aiLabel} AI 正在深度分析简历与岗位匹配度...</p>
-            <p style={{ fontSize: '12px', color: '#94a3b8' }}>预计耗时 30-60 秒，请耐心等待</p>
+            <p>正在深度分析简历与岗位匹配度...</p>
+            <p style={{ fontSize: '12px', color: '#94a3b8' }}>
+              已耗时 {generationElapsed} 秒 · {generationHint()}
+            </p>
           </div>
         )}
 
@@ -443,11 +467,31 @@ export default function InterviewPrep({ onToast }) {
             ))}
           </SectionCard>
 
+          <SectionCard icon={Target} title="项目深挖问题"
+            badge={`${(data.project_deep_dive_questions || []).length}题 | 已完成 ${(data.project_deep_dive_questions || []).filter((_, i) => completedQuestions.has(i + (data.technical_questions || []).length)).length}/${(data.project_deep_dive_questions || []).length}`}>
+            {(data.project_deep_dive_questions || []).map((q, i) => {
+              const globalIdx = i + (data.technical_questions || []).length
+              return (
+                <QuestionCard
+                  key={`p-${i}`}
+                  index={globalIdx}
+                  q={q.question}
+                  category={q.project ? `项目: ${q.project}` : '项目追问'}
+                  difficulty="高级"
+                  tips={q.danger_zone ? `危险区：${q.danger_zone}` : undefined}
+                  a={`${q.expected_depth ? `面试官期待：${q.expected_depth}\n\n` : ''}${q.suggested_answer || ''}`}
+                  completed={completedQuestions.has(globalIdx)}
+                  onToggle={toggleQuestionComplete}
+                />
+              )
+            })}
+          </SectionCard>
+
           {/* ===== 行为面试问题 ===== */}
           <SectionCard icon={Users} title="行为面试问题（含STAR框架）"
-            badge={`${(data.behavioral_questions || []).length}题 | 已完成 ${(data.behavioral_questions || []).filter((_, i) => completedQuestions.has(i + (data.technical_questions || []).length)).length}/${(data.behavioral_questions || []).length}`}>
+            badge={`${(data.behavioral_questions || []).length}题 | 已完成 ${(data.behavioral_questions || []).filter((_, i) => completedQuestions.has(i + (data.technical_questions || []).length + (data.project_deep_dive_questions || []).length)).length}/${(data.behavioral_questions || []).length}`}>
             {(data.behavioral_questions || []).map((q, i) => {
-              const globalIdx = i + (data.technical_questions || []).length
+              const globalIdx = i + (data.technical_questions || []).length + (data.project_deep_dive_questions || []).length
               return (
                 <QuestionCard
                   key={`b-${i}`}

@@ -84,7 +84,8 @@ export default function Tracker({ onToast }) {
     if (!confirm(`确定要删除选中的 ${selectedIds.size} 条记录吗？`)) return
     setIsBatchDeleting(true)
     try {
-      for (const rowId of selectedIds) {
+      const rowIds = Array.from(selectedIds).sort((a, b) => b - a)
+      for (const rowId of rowIds) {
         await trackerAPI.delete(rowId)
       }
       showToast(onToast, `已删除 ${selectedIds.size} 条记录`, 'success')
@@ -97,11 +98,11 @@ export default function Tracker({ onToast }) {
     }
   }
 
-  const toggleSelect = (index) => {
+  const toggleSelect = (rowId) => {
     setSelectedIds(prev => {
       const next = new Set(prev)
-      if (next.has(index)) next.delete(index)
-      else next.add(index)
+      if (next.has(rowId)) next.delete(rowId)
+      else next.add(rowId)
       return next
     })
   }
@@ -110,7 +111,7 @@ export default function Tracker({ onToast }) {
     if (selectedIds.size === filteredTracker.length) {
       setSelectedIds(new Set())
     } else {
-      setSelectedIds(new Set(filteredTracker.map((_, i) => i)))
+      setSelectedIds(new Set(filteredTracker.map(record => record.rowId)))
     }
   }
 
@@ -200,10 +201,10 @@ export default function Tracker({ onToast }) {
           </thead>
           <tbody>
             {filteredTracker.map((record, index) => (
-              <tr key={index}>
+              <tr key={record.rowId}>
                 <td>
-                  <button onClick={() => toggleSelect(index)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                    {selectedIds.has(index) ? <CheckSquare size={16} /> : <Square size={16} />}
+                  <button onClick={() => toggleSelect(record.rowId)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                    {selectedIds.has(record.rowId) ? <CheckSquare size={16} /> : <Square size={16} />}
                   </button>
                 </td>
                 <td>{record.company}</td>

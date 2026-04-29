@@ -116,25 +116,36 @@ export default function Jobs({ onToast }) {
     const labels = {
       liveness: '检查有效性',
       extract: '提取岗位信息',
-      evaluate: 'AI 评分'
+      evaluate: 'AI 评分',
+      optimize: 'AI 优化 JD'
     }
     setBatchAction(action)
-    let success = 0
-    let failed = 0
 
     try {
-      for (const id of ids) {
-        try {
-          if (action === 'liveness') await jobsAPI.liveness(id)
-          if (action === 'extract') await jobsAPI.extract(id)
-          if (action === 'evaluate') await jobsAPI.evaluate(id, selectedProvider)
-          success++
-        } catch (error) {
-          console.error(`Batch ${action} failed for ${id}:`, error)
-          failed++
+      if (action === 'optimize') {
+        const res = await jobsAPI.batchOptimizeJd(ids, selectedProvider)
+        const summary = res.data || {}
+        showToast(
+          onToast,
+          `${labels[action]}完成：成功 ${summary.successCount || 0} 个${summary.failedCount ? `，失败 ${summary.failedCount} 个` : ''}`,
+          summary.failedCount ? 'warning' : 'success'
+        )
+      } else {
+        let success = 0
+        let failed = 0
+        for (const id of ids) {
+          try {
+            if (action === 'liveness') await jobsAPI.liveness(id)
+            if (action === 'extract') await jobsAPI.extract(id)
+            if (action === 'evaluate') await jobsAPI.evaluate(id, selectedProvider)
+            success++
+          } catch (error) {
+            console.error(`Batch ${action} failed for ${id}:`, error)
+            failed++
+          }
         }
+        showToast(onToast, `${labels[action]}完成：成功 ${success} 个${failed ? `，失败 ${failed} 个` : ''}`, failed ? 'warning' : 'success')
       }
-      showToast(onToast, `${labels[action]}完成：成功 ${success} 个${failed ? `，失败 ${failed} 个` : ''}`, failed ? 'warning' : 'success')
       setSelectedIds(new Set())
       await fetchJobs()
     } finally {
@@ -375,6 +386,19 @@ export default function Jobs({ onToast }) {
                     <RefreshCw style={{ width: '14px', height: '14px', marginRight: '6px' }} />
                   )}
                   {batchButtonLabel('extract', '批量提取')}
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => handleBatchAction('optimize')}
+                  disabled={Boolean(batchAction) || isBatchDeleting}
+                  title="批量 AI 优化选中岗位的 JD"
+                >
+                  {batchAction === 'optimize' ? (
+                    <Loader2 style={{ width: '14px', height: '14px', marginRight: '6px', animation: 'spin 1s linear infinite' }} />
+                  ) : (
+                    <RefreshCw style={{ width: '14px', height: '14px', marginRight: '6px' }} />
+                  )}
+                  {batchButtonLabel('optimize', '批量优化JD')}
                 </button>
                 <button
                   className="btn btn-secondary"

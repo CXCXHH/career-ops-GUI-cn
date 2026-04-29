@@ -164,8 +164,8 @@ career-ops/
 | `config/profile.yml` | 重置为模板占位符，移除姓名、电话、邮箱、微信 |
 | `data/job-radar/resume-profile.json` | 清空所有个人字段 |
 | `.env` | 确认无真实 API Key，保留空模板 |
-| `output/cv-陈翔-*.pdf` | 已删除 |
-| `tmp/cv-陈翔-*.html` | 已删除 |
+| `output/cv-*.pdf` | 已删除 |
+| `tmp/cv-*.html` | 已删除 |
 
 ### 5.2 冗余文件清理
 
@@ -224,6 +224,11 @@ career-ops/
 ### 5.5 简历生成页（ResumeBuilder）体验优化
 
 **修改文件：** `gui/src/pages/ResumeBuilder.jsx`、`gui/src/api/index.js`、`gui/src/styles/index.css`、`gui/server.mjs`
+
+**协作约定补充：**
+- 只要涉及 GUI 功能变更，默认同时检查前端页面/组件、`gui/src/api/index.js` 接口层、以及 `gui/server.mjs` 后端实现，避免只改一侧导致功能、字段、返回结构或交互状态不一致。
+- 即使需求表面上看是前端调整，也要先判断是否影响后端接口、持久化字段、默认值、校验逻辑、文件读写或返回 payload；若有影响，前后端必须同步修改。
+- 仅当改动明确属于纯展示层调整（如导航顺序、纯样式、文案微调，且不涉及接口行为）时，才允许只改前端。
 
 **功能变更：**
 

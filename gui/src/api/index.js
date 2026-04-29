@@ -45,6 +45,7 @@ export const jobsAPI = {
   update: (id, data) => unwrap(axios.patch(`${API_BASE}/jobs/${id}`, data)),
   batchAdd: (jobs) => unwrap(axios.post(`${API_BASE}/jobs/batch-add`, { jobs })),
   batchDelete: (ids) => unwrap(axios.post(`${API_BASE}/jobs/batch-delete`, { ids })),
+  batchOptimizeJd: (ids, provider) => unwrap(axios.post(`${API_BASE}/jobs/batch-optimize-jd`, { ids, provider })),
   importUrl: (url) => unwrap(axios.post(`${API_BASE}/jobs/import-url`, { url })),
   extract: (id) => unwrap(axios.post(`${API_BASE}/jobs/${id}/extract`)),
   optimizeJd: (id, provider) => unwrap(axios.post(`${API_BASE}/jobs/${id}/optimize-jd`, { provider })),
@@ -53,7 +54,6 @@ export const jobsAPI = {
   delete: (id) => unwrap(axios.delete(`${API_BASE}/jobs/${id}`)),
   validate: () => unwrap(axios.post(`${API_BASE}/jobs/validate`)),
   getEvaluation: (id) => unwrap(axios.get(`${API_BASE}/jobs/${id}/evaluation`)),
-  generateDocx: (id, provider) => unwrap(axios.post(`${API_BASE}/jobs/${id}/resume/docx`, { provider })),
   generatePdf: (id, provider) => unwrap(axios.post(`${API_BASE}/jobs/${id}/resume/pdf`, { provider })),
   getResumeFiles: (id) => unwrap(axios.get(`${API_BASE}/jobs/${id}/resume/files`)),
   addToTracker: (id) => unwrap(axios.post(`${API_BASE}/jobs/${id}/tracker-addition`))
@@ -62,7 +62,8 @@ export const jobsAPI = {
 export const aiAPI = {
   getProviders: () => unwrap(axios.get(`${API_BASE}/ai/providers`)),
   getSettings: () => unwrap(axios.get(`${API_BASE}/ai/settings`)),
-  saveSettings: (data) => unwrap(axios.post(`${API_BASE}/ai/settings`, data))
+  saveSettings: (data) => unwrap(axios.post(`${API_BASE}/ai/settings`, data)),
+  clearSettings: (provider) => unwrap(axios.delete(`${API_BASE}/ai/settings/${provider}`))
 }
 
 export const resumeAPI = {

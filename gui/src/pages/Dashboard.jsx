@@ -50,8 +50,8 @@ export default function Dashboard({ onToast }) {
   const runDoctor = async () => {
     try {
       const res = await healthAPI.doctor()
-      setHealthStatus(res.data)
-      showToast(onToast, '健康检查完成', 'success')
+      setHealthStatus(res.data.checks)
+      showToast(onToast, '健康检查完成，缺失依赖已尝试自动安装', 'success')
     } catch (error) {
       showToast(onToast, '健康检查失败', 'error')
     }
@@ -119,7 +119,7 @@ export default function Dashboard({ onToast }) {
         <div className="card-header">
           <div className="card-title">项目健康状态</div>
           <button className="btn btn-primary btn-sm" onClick={runDoctor}>
-            运行检查
+            运行检查并安装依赖
           </button>
         </div>
         {healthStatus && (

@@ -13,6 +13,7 @@ export default function Settings({ onToast }) {
     doubao: { apiKey: '', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-seed-1-6-251015' }
   })
   const [isSavingAi, setIsSavingAi] = useState(false)
+  const [clearingProvider, setClearingProvider] = useState('')
 
   useEffect(() => {
     fetchHealth()
@@ -88,17 +89,37 @@ export default function Settings({ onToast }) {
     }
   }
 
+  const clearAiSettings = async (provider) => {
+    const providerLabel = provider === 'deepseek' ? 'DeepSeek' : '豆包 / 火山方舟'
+    if (!window.confirm(`确定要清除 ${providerLabel} 已保存的 API Key 吗？`)) return
+
+    setClearingProvider(provider)
+    try {
+      const res = await aiAPI.clearSettings(provider)
+      setAiSettings(res.data)
+      setAiForm(prev => ({
+        ...prev,
+        [provider]: {
+          ...prev[provider],
+          apiKey: ''
+        }
+      }))
+      showToast(onToast, `${providerLabel} API Key 已清除`, 'success')
+    } catch (error) {
+      showToast(onToast, `清除失败：${error.message}`, 'error')
+    } finally {
+      setClearingProvider('')
+    }
+  }
+
   const runDoctor = async () => {
     setIsRunning(true)
     setCommandOutput('')
     try {
       const res = await healthAPI.doctor()
-      setHealthStatus(res.data)
-      setCommandOutput('Doctor check completed successfully\n')
-      Object.entries(res.data).forEach(([key, value]) => {
-        setCommandOutput(prev => prev + `${key}: ${value.status} - ${value.message}\n`)
-      })
-      showToast(onToast, '健康检查完成', 'success')
+      setHealthStatus(res.data.checks)
+      setCommandOutput(res.data.output || 'Doctor check completed\n')
+      showToast(onToast, '健康检查完成，缺失依赖已尝试自动安装', 'success')
     } catch (error) {
       setCommandOutput(`Error: ${error.message}\n`)
       showToast(onToast, '健康检查失败', 'error')
@@ -158,7 +179,7 @@ export default function Settings({ onToast }) {
           <div className="card-title">系统健康状态</div>
           <button className="btn btn-primary btn-sm" onClick={runDoctor} disabled={isRunning}>
             <Activity style={{ width: '14px', height: '14px', marginRight: '6px' }} />
-            运行检查
+            运行检查并安装依赖
           </button>
         </div>
         {healthStatus && (
@@ -188,7 +209,7 @@ export default function Settings({ onToast }) {
           <div>
             <div className="card-title">AI API 评分配置</div>
             <p style={{ color: '#64748b', fontSize: '13px', marginTop: '4px' }}>
-              API Key 会保存到本机项目 .env 文件。留空 Key 时只更新模型和地址，不会清空已有 Key。
+              API Key 会保存到本机项目 .env 文件。留空 Key 时只更新模型和地址，不会清空已有 Key；如需删除，请使用清除按钮。
             </p>
           </div>
           <button className="btn btn-primary btn-sm" onClick={saveAiSettings} disabled={isSavingAi}>
@@ -201,9 +222,19 @@ export default function Settings({ onToast }) {
           <div className="provider-card">
             <div className="provider-title">
               <strong>DeepSeek</strong>
-              <span className={`status-badge ${aiSettings?.deepseek?.configured ? 'status-active' : 'status-unconfirmed'}`}>
-                {aiSettings?.deepseek?.configured ? `已配置 ${aiSettings.deepseek.apiKeyMasked}` : '未配置'}
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className={`status-badge ${aiSettings?.deepseek?.configured ? 'status-active' : 'status-unconfirmed'}`}>
+                  {aiSettings?.deepseek?.configured ? `已配置 ${aiSettings.deepseek.apiKeyMasked}` : '未配置'}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => clearAiSettings('deepseek')}
+                  disabled={!aiSettings?.deepseek?.configured || clearingProvider === 'deepseek' || isSavingAi}
+                >
+                  {clearingProvider === 'deepseek' ? '清除中...' : '清除'}
+                </button>
+              </div>
             </div>
             <div className="form-group">
               <label>API Key</label>
@@ -237,9 +268,19 @@ export default function Settings({ onToast }) {
           <div className="provider-card">
             <div className="provider-title">
               <strong>豆包 / 火山方舟</strong>
-              <span className={`status-badge ${aiSettings?.doubao?.configured ? 'status-active' : 'status-unconfirmed'}`}>
-                {aiSettings?.doubao?.configured ? `已配置 ${aiSettings.doubao.apiKeyMasked}` : '未配置'}
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className={`status-badge ${aiSettings?.doubao?.configured ? 'status-active' : 'status-unconfirmed'}`}>
+                  {aiSettings?.doubao?.configured ? `已配置 ${aiSettings.doubao.apiKeyMasked}` : '未配置'}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => clearAiSettings('doubao')}
+                  disabled={!aiSettings?.doubao?.configured || clearingProvider === 'doubao' || isSavingAi}
+                >
+                  {clearingProvider === 'doubao' ? '清除中...' : '清除'}
+                </button>
+              </div>
             </div>
             <div className="form-group">
               <label>API Key</label>

@@ -28,6 +28,7 @@ const ADDITIONS_DIR = join(CAREER_OPS, 'batch/tracker-additions');
 const MERGED_DIR = join(ADDITIONS_DIR, 'merged');
 const DRY_RUN = process.argv.includes('--dry-run');
 const VERIFY = process.argv.includes('--verify');
+const TRACKER_TEMPLATE = '# Applications Tracker\n\n| # | Date | Company | Role | Score | Status | PDF | Report | Notes |\n|---|------|---------|------|-------|--------|-----|--------|-------|\n';
 
 // Ensure required directories exist (fresh setup)
 mkdirSync(join(CAREER_OPS, 'data'), { recursive: true });
@@ -187,10 +188,26 @@ function parseTsvContent(content, filename) {
 
 // Read applications.md
 if (!existsSync(APPS_FILE)) {
-  console.log('No applications.md found. Nothing to merge into.');
-  process.exit(0);
+  if (!DRY_RUN) {
+    writeFileSync(APPS_FILE, TRACKER_TEMPLATE, 'utf-8');
+    console.log('🆕 Created applications.md from default tracker template.');
+  } else {
+    console.log('No applications.md found. Dry-run mode cannot create it.');
+    process.exit(0);
+  }
 }
-const appContent = readFileSync(APPS_FILE, 'utf-8');
+let appContent = readFileSync(APPS_FILE, 'utf-8');
+if (!appContent.includes('| # | Date | Company | Role | Score | Status | PDF | Report | Notes |') ||
+    !appContent.includes('|---|------|---------|------|-------|--------|-----|--------|-------|')) {
+  const bodyLines = appContent
+    .split('\n')
+    .filter(line => line.trim().startsWith('|') && !line.includes('---'));
+  appContent = TRACKER_TEMPLATE + (bodyLines.length ? `${bodyLines.join('\n')}\n` : '');
+  if (!DRY_RUN) {
+    writeFileSync(APPS_FILE, appContent, 'utf-8');
+    console.log('🛠️  Repaired malformed applications.md header.');
+  }
+}
 const appLines = appContent.split('\n');
 const existingApps = [];
 let maxNum = 0;

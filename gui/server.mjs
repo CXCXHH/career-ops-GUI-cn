@@ -27,6 +27,8 @@ const CANDIDATES_FILE = `${PROJECT_ROOT}/data/job-radar/candidates.jsonl`
 const DISCOVERY_RUNS_FILE = `${PROJECT_ROOT}/data/job-radar/discovery-runs.jsonl`
 const RESUME_PROFILE_FILE = `${PROJECT_ROOT}/data/job-radar/resume-profile.json`
 const PORTALS_FILE = `${PROJECT_ROOT}/portals.yml`
+const TRACKER_FILE = `${PROJECT_ROOT}/data/applications.md`
+const TRACKER_TEMPLATE = '# Applications Tracker\n\n| # | Date | Company | Role | Score | Status | PDF | Report | Notes |\n|---|------|---------|------|-------|--------|-----|--------|-------|\n'
 
 const DEFAULT_RESUME_MODULES = [
   { id: 'summary', name: '求职定位', type: 'builtin', enabled: true },
@@ -43,6 +45,31 @@ function normalizeResumeModules(modules) {
 }
 
 const BUILTIN_RESUME_DATA_MODULES = new Set(['education', 'experience', 'projects'])
+
+function ensureTrackerFile() {
+  if (!existsSync(TRACKER_FILE)) {
+    writeFileSync(TRACKER_FILE, TRACKER_TEMPLATE, 'utf-8')
+    return TRACKER_FILE
+  }
+
+  const content = readFileSync(TRACKER_FILE, 'utf-8')
+  const hasHeaderRow = content.includes('| # | Date | Company | Role | Score | Status | PDF | Report | Notes |')
+  const hasDividerRow = content.includes('|---|------|---------|------|-------|--------|-----|--------|-------|')
+
+  if (!hasHeaderRow || !hasDividerRow) {
+    const bodyLines = content
+      .split('\n')
+      .filter(line => line.trim().startsWith('|') && !line.includes('---'))
+    const normalized = TRACKER_TEMPLATE + (bodyLines.length ? `${bodyLines.join('\n')}\n` : '')
+    writeFileSync(TRACKER_FILE, normalized, 'utf-8')
+  }
+
+  return TRACKER_FILE
+}
+
+function getTrackerFilePath() {
+  return existsSync(TRACKER_FILE) ? TRACKER_FILE : `${PROJECT_ROOT}/applications.md`
+}
 
 function loadDotEnv() {
   const envPath = `${PROJECT_ROOT}/.env`
@@ -629,6 +656,18 @@ function saveAiSettings(settings) {
   return getAiSettings()
 }
 
+function clearAiSettings(provider) {
+  if (provider === 'deepseek') {
+    writeEnvFile({ DEEPSEEK_API_KEY: '' })
+    return getAiSettings()
+  }
+  if (provider === 'doubao') {
+    writeEnvFile({ ARK_API_KEY: '', DOUBAO_API_KEY: '' })
+    return getAiSettings()
+  }
+  throw new Error('不支持的 AI Provider')
+}
+
 function buildCandidateResumeContext() {
   const cv = readTextIfExists(`${PROJECT_ROOT}/cv.md`, 16000).trim()
   if (cv) return cv
@@ -977,13 +1016,20 @@ function normalizeInterviewPrepResult(result = {}) {
   const technicalQuestions = arrayOrEmpty(result.technical_questions)
   const projectQuestions = arrayOrEmpty(result.project_deep_dive_questions)
   const behavioralQuestions = arrayOrEmpty(result.behavioral_questions)
+  const targetCounts = { technical: 18, project: 8, behavioral: 8 }
 
   return {
     ...result,
     match_score: Number.isFinite(matchScore) ? Math.max(0, Math.min(100, Math.round(matchScore))) : 0,
     match_level: result.match_level || '基本匹配',
     job_analysis: result.job_analysis || '',
-    question_plan: objectOrEmpty(result.question_plan),
+    question_plan: {
+      minimum_total_questions: targetCounts.technical + targetCounts.project + targetCounts.behavioral,
+      technical_count: targetCounts.technical,
+      project_deep_dive_count: targetCounts.project,
+      behavioral_count: targetCounts.behavioral,
+      ...objectOrEmpty(result.question_plan)
+    },
     strengths: arrayOrEmpty(result.strengths),
     weaknesses: arrayOrEmpty(result.weaknesses),
     must_talk_projects: arrayOrEmpty(result.must_talk_projects),
@@ -997,6 +1043,106 @@ function normalizeInterviewPrepResult(result = {}) {
     questions_for_interviewer: arrayOrEmpty(result.questions_for_interviewer),
     total_core_questions: technicalQuestions.length + projectQuestions.length + behavioralQuestions.length
   }
+}
+
+function uniqueQuestionItems(items, keyNames = ['question']) {
+  const seen = new Set()
+  const result = []
+  for (const item of Array.isArray(items) ? items : []) {
+    const key = keyNames
+      .map(name => String(item?.[name] || '').trim().toLowerCase())
+      .filter(Boolean)
+      .join(' | ')
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    result.push(item)
+  }
+  return result
+}
+
+function buildInterviewProjectContext(projects = []) {
+  return projects
+    .slice(0, 3)
+    .map((project, index) => {
+      const aiTag = project.ai_generated ? `AI生成:${project.ai_target_job || ''}` : '用户项目'
+      const summary = [
+        `${index + 1}. ${project.name || '未命名项目'} (${aiTag})`,
+        `角色:${project.role || '个人项目'}`,
+        project.start_date || project.end_date ? `时间:${[project.start_date, project.end_date || '至今'].filter(Boolean).join('至')}` : '',
+        project.tech_stack ? `技术栈:${String(project.tech_stack).replace(/\s+/g, ' ').slice(0, 180)}` : '',
+        project.description ? `描述:${String(project.description).replace(/\s+/g, ' ').slice(0, 260)}` : ''
+      ].filter(Boolean)
+      return summary.join(' | ')
+    })
+    .join('\n')
+}
+
+async function supplementInterviewPrepQuestions(provider, context, current) {
+  const technicalQuestions = uniqueQuestionItems(current.technical_questions, ['question'])
+  const projectQuestions = uniqueQuestionItems(current.project_deep_dive_questions, ['project', 'question'])
+  const behavioralQuestions = uniqueQuestionItems(current.behavioral_questions, ['question'])
+  const missingTechnical = Math.max(0, 18 - technicalQuestions.length)
+  const missingProject = Math.max(0, 8 - projectQuestions.length)
+  const missingBehavioral = Math.max(0, 8 - behavioralQuestions.length)
+
+  if (!missingTechnical && !missingProject && !missingBehavioral) {
+    return current
+  }
+
+  const prompt = `请补齐面试题数量不足的问题。题目必须真实、严格、像一线面试官的高压追问，不能温和，不能像教学题库。
+
+只返回JSON:
+{
+  "technical_questions": [
+    {"question":"问题","category":"分类","difficulty":"基础|中级|高级","suggested_answer":"60-100字，包含原理/做法/风险边界","tips":"加分技巧"}
+  ],
+  "project_deep_dive_questions": [
+    {"project":"项目名","question":"项目追问","expected_depth":"期望深度","suggested_answer":"80-120字建议回答","danger_zone":"不要这样回答"}
+  ],
+  "behavioral_questions": [
+    {"question":"行为问题","type":"类型","suggested_answer":"80-120字STAR回答框架","star_framework":"S/T/A/R提示"}
+  ]
+}
+
+补齐目标:
+- technical_questions 还缺 ${missingTechnical} 道
+- project_deep_dive_questions 还缺 ${missingProject} 道
+- behavioral_questions 还缺 ${missingBehavioral} 道
+
+硬性要求:
+1. technical_questions 必须围绕 JD 技术关键词、真实工程故障、调试细节、性能边界、线上风险、方案取舍来问。
+2. project_deep_dive_questions 必须优先围绕用户自填项目追问；如果用户项目不足，再追问 AI 生成项目，但答案必须写清诚实边界。
+3. behavioral_questions 不要泛泛而谈，必须带压力场景、冲突、失误、返工、延期、背锅、指标失守、跨团队争议等真实面试风格。
+4. 所有新增问题不得与已有问题重复。
+
+已有技术题:
+${technicalQuestions.map((q, i) => `${i + 1}. ${q.question}`).join('\n') || '无'}
+
+已有项目深挖题:
+${projectQuestions.map((q, i) => `${i + 1}. [${q.project || '未标注项目'}] ${q.question}`).join('\n') || '无'}
+
+已有行为题:
+${behavioralQuestions.map((q, i) => `${i + 1}. ${q.question}`).join('\n') || '无'}
+
+资料:
+${context.text}`
+
+  const extra = await callInterviewPrepPart(provider, prompt, 2600, '面试补题')
+  return normalizeInterviewPrepResult({
+    ...current,
+    technical_questions: uniqueQuestionItems([
+      ...technicalQuestions,
+      ...(Array.isArray(extra.technical_questions) ? extra.technical_questions : [])
+    ], ['question']).slice(0, Math.max(18, technicalQuestions.length + missingTechnical)),
+    project_deep_dive_questions: uniqueQuestionItems([
+      ...projectQuestions,
+      ...(Array.isArray(extra.project_deep_dive_questions) ? extra.project_deep_dive_questions : [])
+    ], ['project', 'question']).slice(0, Math.max(8, projectQuestions.length + missingProject)),
+    behavioral_questions: uniqueQuestionItems([
+      ...behavioralQuestions,
+      ...(Array.isArray(extra.behavioral_questions) ? extra.behavioral_questions : [])
+    ], ['question']).slice(0, Math.max(8, behavioralQuestions.length + missingBehavioral))
+  })
 }
 
 async function callChatCompletions(provider, prompt, options = {}) {
@@ -1233,10 +1379,7 @@ function buildInterviewPrepSharedContext(job) {
   const evidence = buildEvidenceInventory(resumeProfile, job)
   const domain = inferJobDomain(job, resumeProfile)
   const seniority = inferSeniority(job)
-  const projects = evidence.projects.map((p, i) => {
-    const aiTag = p.ai_generated ? `AI生成:${p.ai_target_job || ''}` : '用户项目'
-    return `${i + 1}. ${p.name || '未命名项目'} (${aiTag})\n角色:${p.role || '个人项目'} | 时间:${p.start_date || '?'}至${p.end_date || '至今'} | 技术栈:${p.tech_stack || '无'}\n描述:${String(p.description || '').replace(/\s+/g, ' ').slice(0, 800)}`
-  }).join('\n')
+  const projects = buildInterviewProjectContext(evidence.projects)
   const jdQuality = [
     job.ai_jd_confidence && `AI清洗置信度:${job.ai_jd_confidence}`,
     Array.isArray(job.ai_jd_warnings) && job.ai_jd_warnings.length ? `JD风险:${job.ai_jd_warnings.join('；')}` : '',
@@ -1252,17 +1395,17 @@ function buildInterviewPrepSharedContext(job) {
       `URL:${job.url || '未知'}`,
       jdQuality,
       `岗位领域:${domain.label}(${domain.primary}); 层级:${seniority}; 信号:${domain.signals.join('、') || '无'}`,
-      `用于准备的JD:\n${String(buildEvaluableJobDescription(job) || '').slice(0, 5200)}`,
-      `候选人简历:\n${buildCandidateResumeContext().slice(0, 5200)}`,
+      `用于准备的JD:\n${String(buildEvaluableJobDescription(job) || '').slice(0, 2600)}`,
+      `候选人简历:\n${buildCandidateResumeContext().slice(0, 1800)}`,
       `候选人项目:\n${projects || '无'}`
     ].filter(Boolean).join('\n\n')
   }
 }
 
-async function callInterviewPrepPart(provider, prompt, maxTokens = 4500) {
+async function callInterviewPrepPart(provider, prompt, maxTokens = 4500, label = '面试准备分段') {
   const response = await callChatCompletions(provider, prompt, {
     maxTokens,
-    temperature: 0.25,
+    temperature: 0.1,
     timeoutMs: 120000,
     systemPrompt: '你是严格输出 JSON 对象的中文面试辅导专家。不要输出 Markdown，不要输出 JSON 之外的文字。'
   })
@@ -1274,14 +1417,18 @@ async function callInterviewPrepPart(provider, prompt, maxTokens = 4500) {
 上一次输出不是合法 JSON。请重新输出，必须满足：
 1. 只输出一个合法 JSON 对象。
 2. 不要 Markdown，不要代码块。
-3. 所有回答压缩到80-130字，不要在字符串里使用未转义换行。
+3. 所有长文本压缩到60-110字，不要在字符串里使用未转义换行。
 4. 数组数量仍按要求生成。`, {
       maxTokens,
       temperature: 0.15,
       timeoutMs: 120000,
       systemPrompt: '你是严格输出合法 JSON 对象的中文面试辅导专家。不要输出 Markdown，不要输出 JSON 之外的文字。'
     })
-    return extractJsonObject(retry.content)
+    try {
+      return extractJsonObject(retry.content)
+    } catch (retryError) {
+      throw new Error(`${label}生成失败：AI 返回的 JSON 不完整或格式错误，通常是输出过长导致被截断。`)
+    }
   }
 }
 
@@ -1294,7 +1441,7 @@ async function generateInterviewPrepSegmented(job, provider) {
   "match_score": 80,
   "match_level": "高度匹配|较为匹配|基本匹配|匹配度较低",
   "job_analysis": "250-400字，分析岗位职责、技术栈、业务场景和面试关注点",
-  "question_plan": {"domain":"${context.domain.primary}","minimum_total_questions":23,"technical_count":12,"project_deep_dive_count":6,"behavioral_count":5,"reason":"规划原因"},
+  "question_plan": {"domain":"${context.domain.primary}","minimum_total_questions":34,"technical_count":18,"project_deep_dive_count":8,"behavioral_count":8,"reason":"规划原因"},
   "company_interview_profile": {"likely_interview_style":"面试风格","company_specific_focus":["重点1"],"jd_evidence":["JD证据1"],"inference_boundary":"推断边界"},
   "strengths": [{"area":"优势","detail":"结合简历的具体说明","evidence":"证据"}],
   "weaknesses": [{"gap":"短板","severity":"高|中|低","improvement":"改进建议"}],
@@ -1307,53 +1454,116 @@ async function generateInterviewPrepSegmented(job, provider) {
 资料:
 ${context.text}`
 
-  const techPrompt = `请生成该公司该岗位最可能问的技术面试题。题目必须贴合JD关键词、公司业务场景或候选人项目，避免通用题库。
+  const techPromptA = `请生成该公司该岗位最可能问的第一批技术面试题。题目必须贴合JD关键词、公司业务场景或候选人项目，避免通用题库。
+题目风格必须真实、严格、带压迫感，像一线面试官会连续追问的问题，不能是培训机构式温和提问。
 
 只返回JSON:
 {
   "technical_questions": [
-    {"question":"问题","category":"分类","difficulty":"基础|中级|高级","domain":"${context.domain.primary}","why_it_matters":"为什么该岗位会问","suggested_answer":"120-180字，包含原理/做法/项目连接/风险边界","candidate_bridge":"如何连接候选人项目","tips":"加分技巧"}
+    {"question":"问题","category":"分类","difficulty":"基础|中级|高级","suggested_answer":"60-100字，包含原理/做法/风险边界","tips":"加分技巧"}
   ]
 }
 
-要求: technical_questions 恰好12道，覆盖基础、现场调试、工程问题和岗位高频追问。
+要求:
+1. technical_questions 恰好6道。
+2. 本批次优先覆盖基础原理、现场调试、工程问题、协议/接口、异常定位、性能瓶颈。
+3. 至少一半问题必须是追问式、带条件限制或失败场景的问题，例如“如果...你怎么证明...”“出了这个故障你第一步查什么”。
+4. 问题必须尽量像真实公司面试，不要写成教材目录。
 
 资料:
 ${context.text}`
 
-  const projectPrompt = `请生成项目深挖题、行为题和AI/补足项目讲法。必须帮助候选人诚实准备，不能鼓励谎称生产上线、客户、量产、论文、竞赛或奖项。
+  const techPromptB = `请生成该公司该岗位最可能问的第二批技术面试题。题目必须贴合JD关键词、公司业务场景或候选人项目，避免通用题库。
+题目风格必须真实、严格、带压迫感，像一线面试官会连续追问的问题，不能是培训机构式温和提问。
+
+只返回JSON:
+{
+  "technical_questions": [
+    {"question":"问题","category":"分类","difficulty":"基础|中级|高级","suggested_answer":"60-100字，包含原理/做法/风险边界","tips":"加分技巧"}
+  ]
+}
+
+要求:
+1. technical_questions 恰好6道。
+2. 本批次优先覆盖可靠性、方案取舍、架构边界、线上/现场故障、验证方法、风险控制。
+3. 至少一半问题必须是追问式、带条件限制或失败场景的问题，例如“你怎么证明...”“如果线上已经出问题你怎么止损”。
+4. 不要与第一批常见基础题重复，不要重复同一知识点表述。
+
+资料:
+${context.text}`
+
+  const projectPrompt = `请生成项目深挖题。必须帮助候选人诚实准备，不能鼓励谎称生产上线、客户、量产、论文、竞赛或奖项。
+题目风格必须真实、严格、像会抓漏洞的面试官，不要写成泛泛而谈的温和提问。
+
+只返回JSON:
+{
+  "project_deep_dive_questions": [
+    {"project":"项目名","question":"项目追问","expected_depth":"期望深度","suggested_answer":"80-120字建议回答","danger_zone":"不要这样回答"}
+  ]
+}
+
+要求:
+1. project_deep_dive_questions 恰好8道，且优先围绕用户自填项目；如果用户项目不足，再围绕 AI 生成项目。
+2. 至少4道项目题必须追问实现细节、调试过程、指标真实性、异常排查、方案取舍或失败复盘。
+3. 至少2道问题要直接逼问“数据怎么来的”“你怎么证明不是照着教程拼的”“为什么当时不用别的方案”这类真实追问。
+
+资料:
+${context.text}`
+
+  const behavioralPrompt = `请生成行为面试题。题目必须真实、严格、像压力面，不要写成泛泛而谈的温和提问。
+
+只返回JSON:
+{
+  "behavioral_questions": [
+    {"question":"行为问题","type":"类型","suggested_answer":"80-120字STAR回答框架","star_framework":"S/T/A/R提示"}
+  ]
+}
+
+要求:
+1. behavioral_questions 恰好8道。
+2. 必须覆盖冲突、返工、延期、线上事故、技术分歧、沟通失误、优先级冲突、职业规划。
+3. 行为题要问“你当时具体怎么处理”“你做错了什么”“如果重来一次你会怎么改”，不要只问“请介绍一下...”。
+
+资料:
+${context.text}`
+
+  const aiProjectPrompt = `请生成 AI/补足项目讲法。必须帮助候选人诚实准备，不能鼓励谎称生产上线、客户、量产、论文、竞赛或奖项。
 
 只返回JSON:
 {
   "ai_project_explainers": [
-    {"project":"项目名","truth_level":"adapted|gap_bridging|inferred","one_minute_pitch":"一分钟讲法","three_minute_pitch":"三分钟讲法","architecture_to_draw":["模块"],"core_technical_points":["技术点"],"implementation_steps":["步骤"],"likely_followups":[{"question":"追问","answer":"回答","risk":"风险"}],"must_review_before_interview":["补学内容"]}
-  ],
-  "project_deep_dive_questions": [
-    {"project":"项目名","question":"项目追问","expected_depth":"期望深度","suggested_answer":"建议回答","danger_zone":"不要这样回答"}
-  ],
-  "behavioral_questions": [
-    {"question":"行为问题","type":"类型","suggested_answer":"120-180字STAR回答框架","star_framework":"S/T/A/R提示"}
+    {"project":"项目名","truth_level":"adapted|gap_bridging|inferred","one_minute_pitch":"60-100字讲法","three_minute_pitch":"120-180字讲法","architecture_to_draw":["模块"],"core_technical_points":["技术点"],"implementation_steps":["步骤"],"likely_followups":[{"question":"追问","answer":"60-100字回答","risk":"风险"}],"must_review_before_interview":["补学内容"]}
   ]
 }
 
-要求: project_deep_dive_questions 恰好6道，behavioral_questions 恰好5道。
+要求:
+1. 至少覆盖所有 AI 生成项目；如果没有 AI 生成项目，可返回空数组。
+2. 所有回答保持简洁，重点说清诚实边界、实现逻辑、补学重点，不要长篇铺陈。
+3. likely_followups 每个项目最多2条，architecture_to_draw/core_technical_points/implementation_steps/must_review_before_interview 各最多4条。
 
 资料:
 ${context.text}`
 
-  const [base, tech, project] = await Promise.all([
-    callInterviewPrepPart(provider, basePrompt, 4200),
-    callInterviewPrepPart(provider, techPrompt, 5200),
-    callInterviewPrepPart(provider, projectPrompt, 5200)
+  const [base, techA, techB, project, behavioral, aiProjects] = await Promise.all([
+    callInterviewPrepPart(provider, basePrompt, 2800, '面试准备总览'),
+    callInterviewPrepPart(provider, techPromptA, 1800, '技术题第一批'),
+    callInterviewPrepPart(provider, techPromptB, 1800, '技术题第二批'),
+    callInterviewPrepPart(provider, projectPrompt, 2600, '项目深挖题'),
+    callInterviewPrepPart(provider, behavioralPrompt, 2200, '行为面试题'),
+    callInterviewPrepPart(provider, aiProjectPrompt, 2600, 'AI项目讲法')
   ])
 
-  return normalizeInterviewPrepResult({
+  const combined = normalizeInterviewPrepResult({
     ...base,
-    technical_questions: Array.isArray(tech.technical_questions) ? tech.technical_questions : [],
-    ai_project_explainers: Array.isArray(project.ai_project_explainers) ? project.ai_project_explainers : [],
+    technical_questions: uniqueQuestionItems([
+      ...(Array.isArray(techA.technical_questions) ? techA.technical_questions : []),
+      ...(Array.isArray(techB.technical_questions) ? techB.technical_questions : [])
+    ], ['question']).slice(0, 18),
+    ai_project_explainers: Array.isArray(aiProjects.ai_project_explainers) ? aiProjects.ai_project_explainers : [],
     project_deep_dive_questions: Array.isArray(project.project_deep_dive_questions) ? project.project_deep_dive_questions : [],
-    behavioral_questions: Array.isArray(project.behavioral_questions) ? project.behavioral_questions : []
+    behavioral_questions: Array.isArray(behavioral.behavioral_questions) ? behavioral.behavioral_questions : []
   })
+  return supplementInterviewPrepQuestions(provider, context, combined)
 }
 
 function buildInterviewPrepMarkdown(data, company, title, date) {
@@ -2817,7 +3027,7 @@ function listGeneratedResumeFiles() {
   const dir = `${PROJECT_ROOT}/output`
   if (!existsSync(dir)) return []
   return readdirSync(dir)
-    .filter(name => /\.(pdf|docx)$/i.test(name))
+    .filter(name => /\.pdf$/i.test(name))
     .map(name => {
       const fullPath = `${dir}/${name}`
       const stat = statSync(fullPath)
@@ -3304,6 +3514,34 @@ async function runScript(scriptName) {
       }
     })
   })
+}
+
+function getHealthChecks() {
+  return {
+    node: { status: 'pass', message: 'Node.js environment OK' },
+    project: { status: 'pass', message: 'Project root accessible' },
+    dependencies: {
+      status: existsSync(`${PROJECT_ROOT}/node_modules`) ? 'pass' : 'warn',
+      message: existsSync(`${PROJECT_ROOT}/node_modules`) ? 'Root dependencies installed' : 'Root dependencies not installed'
+    },
+    gui_dependencies: {
+      status: existsSync(`${PROJECT_ROOT}/gui/node_modules`) ? 'pass' : 'warn',
+      message: existsSync(`${PROJECT_ROOT}/gui/node_modules`) ? 'GUI dependencies installed' : 'GUI dependencies not installed'
+    },
+    cv: {
+      status: existsSync(`${PROJECT_ROOT}/cv.md`) ? 'pass' : 'warn',
+      message: existsSync(`${PROJECT_ROOT}/cv.md`) ? 'cv.md exists' : 'cv.md not found'
+    },
+    profile: {
+      status: existsSync(`${PROJECT_ROOT}/config/profile.yml`) ? 'pass' : 'warn',
+      message: existsSync(`${PROJECT_ROOT}/config/profile.yml`) ? 'profile.yml exists' : 'profile.yml not found'
+    },
+    portals: {
+      status: existsSync(PORTALS_FILE) ? 'pass' : 'warn',
+      message: existsSync(PORTALS_FILE) ? 'portals.yml exists' : 'portals.yml not found'
+    },
+    data: { status: 'pass', message: 'Data directories OK' }
+  }
 }
 
 async function checkUrlLiveness(url) {
@@ -4207,24 +4445,25 @@ const routes = {
   },
   '/api/health': {
     GET: async () => {
-      const checks = {
-        node: { status: 'pass', message: 'Node.js environment OK' },
-        project: { status: 'pass', message: 'Project root accessible' },
-        cv: { status: existsSync(`${PROJECT_ROOT}/cv.md`) ? 'pass' : 'warn', message: existsSync(`${PROJECT_ROOT}/cv.md`) ? 'cv.md exists' : 'cv.md not found (optional in desensitized mode)' },
-        profile: { status: existsSync(`${PROJECT_ROOT}/config/profile.yml`) ? 'pass' : 'warn', message: existsSync(`${PROJECT_ROOT}/config/profile.yml`) ? 'profile.yml exists' : 'profile.yml not found' },
-        portals: { status: existsSync(PORTALS_FILE) ? 'pass' : 'warn', message: existsSync(PORTALS_FILE) ? 'portals.yml exists' : 'portals.yml not found (optional in desensitized mode)' },
-        data: { status: 'pass', message: 'Data directories OK' }
-      }
-      return { success: true, data: checks }
+      return { success: true, data: getHealthChecks() }
     }
   },
   '/api/health/doctor': {
     POST: async () => {
       const result = await runScript('doctor')
-      const checks = {
-        doctor: { status: result.success ? 'pass' : 'fail', message: result.output.substring(0, 200) }
+      return {
+        success: true,
+        data: {
+          checks: {
+            ...getHealthChecks(),
+            doctor: {
+              status: result.success ? 'pass' : 'fail',
+              message: result.success ? '健康检查已完成，缺失依赖会自动安装' : '健康检查完成，但仍有未修复问题'
+            }
+          },
+          output: result.output
+        }
       }
-      return { success: true, data: checks }
     }
   },
   '/api/health/verify': {
@@ -4250,6 +4489,11 @@ const routes = {
     },
     POST: async (body) => {
       return { success: true, data: saveAiSettings(body || {}) }
+    }
+  },
+  '/api/ai/settings/:provider': {
+    DELETE: async (_, params) => {
+      return { success: true, data: clearAiSettings(params.provider) }
     }
   },
   '/api/resume/profile': {
@@ -4521,6 +4765,40 @@ const routes = {
       return { success: true, data: { added: addedCount, skipped: skippedCount } }
     }
   },
+  '/api/jobs/batch-optimize-jd': {
+    POST: async (body) => {
+      const { ids, provider } = body
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return { success: false, error: 'ids array is required' }
+      }
+
+      const jobs = readJsonl(JOBS_FILE)
+      const idSet = new Set(ids)
+      let successCount = 0
+      let failedCount = 0
+      const failures = []
+
+      for (const job of jobs) {
+        if (!idSet.has(job.id)) continue
+        try {
+          const optimization = await optimizeJobWithAi(job, provider || process.env.AI_EVAL_PROVIDER || 'deepseek')
+          applyJobOptimization(job, optimization)
+          successCount++
+        } catch (error) {
+          failedCount++
+          failures.push({
+            id: job.id,
+            company: job.company || '',
+            title: job.title || '',
+            error: error.message
+          })
+        }
+      }
+
+      writeJsonl(JOBS_FILE, jobs)
+      return { success: true, data: { successCount, failedCount, failures } }
+    }
+  },
   '/api/jobs/validate': {
     POST: async () => {
       const jobs = readJsonl(JOBS_FILE)
@@ -4758,22 +5036,6 @@ const routes = {
       return { success: true, data: { ...evaluation, reportPath } }
     }
   },
-  '/api/jobs/:id/resume/docx': {
-    POST: async (body, params) => {
-      const jobs = readJsonl(JOBS_FILE)
-      const job = jobs.find(j => j.id === params.id)
-      if (!job) return { success: false, error: 'Job not found' }
-      
-      const date = new Date().toISOString().split('T')[0]
-      const profile = getResumeProfile()
-      const stem = resumeFileStem(job, profile, date)
-      const { docx: fileName } = resolveUniqueResumeArtifactNames(stem, [{ dir: 'output', extension: 'docx' }])
-      const resume = await buildTailoredResume(job, profile, body.provider)
-      const docx = createDocxBuffer(resume)
-      writeFileSync(`${PROJECT_ROOT}/output/${fileName}`, docx)
-      return { success: true, data: { fileName, path: `output/${fileName}` } }
-    }
-  },
   '/api/jobs/:id/resume/pdf': {
     POST: async (body, params) => {
       const jobs = readJsonl(JOBS_FILE)
@@ -4870,6 +5132,7 @@ const routes = {
       }
 
       const tsvFile = generateTrackerTSV(job, reportPath)
+      ensureTrackerFile()
 
       // Auto-merge the TSV into applications.md
       const mergeResult = await runScript('merge-tracker')
@@ -5404,7 +5667,7 @@ const routes = {
 
   '/api/tracker': {
     GET: async () => {
-      const trackerPath = `${PROJECT_ROOT}/data/applications.md`
+      const trackerPath = getTrackerFilePath()
       if (!existsSync(trackerPath)) {
         return { success: true, data: [] }
       }
@@ -5441,7 +5704,7 @@ const routes = {
   },
   '/api/tracker/:rowId': {
     DELETE: async (_, params) => {
-      const trackerPath = `${PROJECT_ROOT}/data/applications.md`
+      const trackerPath = getTrackerFilePath()
       if (!existsSync(trackerPath)) return { success: false, error: 'Tracker not found' }
 
       const content = readFileSync(trackerPath, 'utf-8')
@@ -5458,7 +5721,7 @@ const routes = {
   },
   '/api/tracker/:rowId/status': {
     PATCH: async (body, params) => {
-      const trackerPath = `${PROJECT_ROOT}/data/applications.md`
+      const trackerPath = getTrackerFilePath()
       if (!existsSync(trackerPath)) return { success: false, error: 'Tracker not found' }
       
       const content = readFileSync(trackerPath, 'utf-8')
@@ -5482,7 +5745,7 @@ const routes = {
   },
   '/api/tracker/:rowId/notes': {
     PATCH: async (body, params) => {
-      const trackerPath = `${PROJECT_ROOT}/data/applications.md`
+      const trackerPath = getTrackerFilePath()
       if (!existsSync(trackerPath)) return { success: false, error: 'Tracker not found' }
       
       const content = readFileSync(trackerPath, 'utf-8')
@@ -5503,7 +5766,7 @@ const routes = {
       return { success: true }
     },
     DELETE: async (_, params) => {
-      const trackerPath = `${PROJECT_ROOT}/data/applications.md`
+      const trackerPath = getTrackerFilePath()
       if (!existsSync(trackerPath)) return { success: false, error: 'Tracker not found' }
 
       const content = readFileSync(trackerPath, 'utf-8')
@@ -5655,7 +5918,7 @@ const routes = {
         const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' })
 
         // Find app info from applications.md for this id
-        const appsFile = `${PROJECT_ROOT}/data/applications.md`
+        const appsFile = getTrackerFilePath()
         let appInfo = null
         if (existsSync(appsFile)) {
           const appsContent = readFileSync(appsFile, 'utf-8')
@@ -5706,7 +5969,7 @@ const routes = {
       const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' })
 
       let appInfo = null
-      const appsFile = `${PROJECT_ROOT}/data/applications.md`
+      const appsFile = getTrackerFilePath()
       if (existsSync(appsFile)) {
         for (const line of readFileSync(appsFile, 'utf-8').split('\n')) {
           if (line.startsWith('|') && !line.includes('Company') && !line.includes('---')) {
@@ -5810,9 +6073,7 @@ async function handleRequest(req, res) {
     const lower = filePath.toLowerCase()
     const type = lower.endsWith('.pdf')
       ? 'application/pdf'
-      : lower.endsWith('.docx')
-        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        : 'application/octet-stream'
+      : 'application/octet-stream'
     res.writeHead(200, { 'Content-Type': type })
     res.end(readFileSync(filePath))
     return

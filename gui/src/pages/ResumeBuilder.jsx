@@ -92,13 +92,23 @@ function YearSelect({ value, onChange, onToggleFold }) {
 }
 
 function DateField({ value, onChange }) {
-  const { year, month } = parseDateVal(value)
+  const parsed = parseDateVal(value)
+  const [year, setYear] = useState(parsed.year)
+  const [month, setMonth] = useState(parsed.month)
   const [folded, setFolded] = useState(false)
 
+  useEffect(() => {
+    const next = parseDateVal(value)
+    setYear(next.year)
+    setMonth(next.month)
+  }, [value])
+
   const updateYear = (y) => {
-    onChange((month && y) ? `${y}-${month}` : '')
+    setYear(y)
+    onChange((y && month) ? `${y}-${month}` : '')
   }
   const updateMonth = (m) => {
+    setMonth(m)
     onChange((year && m) ? `${year}-${m}` : '')
   }
 
@@ -483,7 +493,36 @@ function PreviewModal({ profile, education, experience, projects, modules, photo
   }
 
   const hasText = (value) => asText(value).length > 0
+  const isFilledEducation = (item) => (
+    hasText(item?.school) ||
+    hasText(item?.major) ||
+    hasText(item?.degree) ||
+    hasText(item?.gpa) ||
+    hasText(item?.description) ||
+    hasText(item?.start_date) ||
+    hasText(item?.end_date)
+  )
+  const isFilledExperience = (item) => (
+    hasText(item?.company) ||
+    hasText(item?.position) ||
+    hasText(item?.role) ||
+    hasText(item?.description) ||
+    hasText(item?.start_date) ||
+    hasText(item?.end_date)
+  )
+  const isFilledProject = (item) => (
+    hasText(item?.name) ||
+    hasText(item?.role) ||
+    hasText(item?.tech_stack) ||
+    hasText(item?.description) ||
+    hasText(item?.responsibility) ||
+    hasText(item?.start_date) ||
+    hasText(item?.end_date)
+  )
   const photoSrc = resolvePhotoSrc(profile, photoPreview)
+  const previewEducation = (education || []).filter(isFilledEducation)
+  const previewExperience = (experience || []).filter(isFilledExperience)
+  const previewProjects = (projects || []).filter(isFilledProject)
 
   const formatDate = (date) => {
     if (!date) return ''
@@ -550,10 +589,10 @@ function PreviewModal({ profile, education, experience, projects, modules, photo
         )
       }
       case 'experience':
-        return experience.length > 0 ? (
+        return previewExperience.length > 0 ? (
           <section key="experience" className="resume-preview-section">
             {renderSectionTitle('工作经历')}
-            {experience.map((item, i) => (
+            {previewExperience.map((item, i) => (
               <div key={i} className="resume-preview-item">
                 <div className="resume-preview-item-head">
                   <span>{[asText(item.company), asText(item.position)].filter(Boolean).join(' | ')}</span>
@@ -570,13 +609,13 @@ function PreviewModal({ profile, education, experience, projects, modules, photo
           </section>
         ) : null
       case 'projects':
-        return projects.length > 0 ? (
+        return previewProjects.length > 0 ? (
           <section key="projects" className="resume-preview-section">
             {renderSectionTitle('项目经历')}
-            {projects.map((item, i) => (
+            {previewProjects.map((item, i) => (
               <div key={i} className="resume-preview-item">
                 <div className="resume-preview-item-head resume-preview-item-head-triplet">
-                  <span>{asText(item.name) || '项目经历'}</span>
+                  <span>{asText(item.name)}</span>
                   <span className="resume-preview-centered">{asText(item.role)}</span>
                   <span className="resume-preview-muted resume-preview-right">{formatDate(item.start_date)} ~ {formatDate(item.end_date)}</span>
                 </div>
@@ -591,10 +630,10 @@ function PreviewModal({ profile, education, experience, projects, modules, photo
           </section>
         ) : null
       case 'education':
-        return education.length > 0 ? (
+        return previewEducation.length > 0 ? (
           <section key="education" className="resume-preview-section">
             {renderSectionTitle('教育背景')}
-            {education.map((item, i) => (
+            {previewEducation.map((item, i) => (
               <div key={i} className="resume-preview-item">
                 <div className="resume-preview-item-head">
                   <span>{[asText(item.school), asText(item.major), asText(item.degree)].filter(Boolean).join(' | ')}</span>
@@ -1114,23 +1153,6 @@ export default function ResumeBuilder({ onToast }) {
     setDragOverIndex(null)
   }
 
-  const handleGenerateDocx = async () => {
-    if (!selectedJob) {
-      showToast(onToast, '请选择岗位', 'error')
-      return
-    }
-    setIsGenerating(true)
-    try {
-      const res = await jobsAPI.generateDocx(selectedJob, selectedProvider)
-      setResumeFiles(prev => [res.data, ...prev])
-      showToast(onToast, `Word 简历生成成功：${res.data.fileName}`, 'success')
-    } catch (error) {
-      showToast(onToast, '生成失败', 'error')
-    } finally {
-      setIsGenerating(false)
-    }
-  }
-
   const handleGeneratePdf = async () => {
     if (!selectedJob) {
       showToast(onToast, '请选择岗位', 'error')
@@ -1186,7 +1208,7 @@ export default function ResumeBuilder({ onToast }) {
         <SectionHeader
           icon={User}
           title="基本信息"
-          description="用于后续 Word/PDF 简历生成"
+          description="用于后续 PDF 简历生成"
           onToggle={() => toggleSection('basic')}
           isExpanded={expandedSections.basic}
         />
@@ -1532,13 +1554,6 @@ export default function ResumeBuilder({ onToast }) {
               <div className="btn-text">
                 <span className="btn-label">预览简历</span>
                 <span className="btn-desc">查看简历效果预览</span>
-              </div>
-            </button>
-            <button className="btn btn-success btn-large" onClick={handleGenerateDocx} disabled={!selectedJob || isGenerating}>
-              <FileText size={20} className="btn-icon" />
-              <div className="btn-text">
-                <span className="btn-label">生成 Word</span>
-                <span className="btn-desc">生成定制化 .docx 文件</span>
               </div>
             </button>
             <button className="btn btn-warning btn-large" onClick={handleGeneratePdf} disabled={!selectedJob || isGenerating}>

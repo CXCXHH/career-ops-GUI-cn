@@ -4,7 +4,6 @@ import { Link, useLocation } from 'react-router-dom'
 const navItems = [
   { path: '/', icon: LayoutDashboard, label: '工作台' },
   { path: '/onboarding', icon: ClipboardList, label: '首次使用' },
-  { path: '/companies', icon: Building2, label: '公司库' },
   { path: '/discovery', icon: Search, label: '岗位发现' },
   { path: '/jobs', icon: FileText, label: '岗位列表' },
   { path: '/resume', icon: File, label: '简历生成' },
@@ -12,6 +11,7 @@ const navItems = [
   { path: '/interview', icon: Briefcase, label: '面试准备' },
   { path: '/followups', icon: Bell, label: '跟进提醒' },
   { path: '/candidates', icon: Inbox, label: '候选区' },
+  { path: '/companies', icon: Building2, label: '公司库' },
   { path: '/settings', icon: Settings, label: '设置' }
 ]
 
