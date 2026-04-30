@@ -12,7 +12,11 @@ import { spawnSync } from 'child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, '..', '..');
-const ALIYUN_NPM_REGISTRY = 'https://registry.npmmirror.com/';
+const NPM_REGISTRIES = [
+  { name: 'Aliyun', url: 'https://registry.npmmirror.com/' },
+  { name: 'Tencent', url: 'https://mirrors.cloud.tencent.com/npm/' },
+  { name: 'Official', url: 'https://registry.npmjs.org/' },
+];
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const npxCommand = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 
@@ -20,13 +24,16 @@ const npxCommand = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 const isTTY = process.stdout.isTTY;
 const green = (s) => isTTY ? `\x1b[32m${s}\x1b[0m` : s;
 const red = (s) => isTTY ? `\x1b[31m${s}\x1b[0m` : s;
+const yellow = (s) => isTTY ? `\x1b[33m${s}\x1b[0m` : s;
 const dim = (s) => isTTY ? `\x1b[2m${s}\x1b[0m` : s;
+const bold = (s) => isTTY ? `\x1b[1m${s}\x1b[0m` : s;
 
-function runCommand(command, args, cwd, extraEnv = {}) {
+function runCommand(command, args, cwd, extraEnv = {}, showOutput = false) {
   const result = spawnSync(command, args, {
     cwd,
     encoding: 'utf-8',
-    stdio: 'pipe',
+    stdio: showOutput ? 'inherit' : 'pipe',
+    shell: true,
     env: {
       ...process.env,
       ...extraEnv,
@@ -35,19 +42,36 @@ function runCommand(command, args, cwd, extraEnv = {}) {
 
   return {
     pass: result.status === 0,
-    output: [result.stdout, result.stderr].filter(Boolean).join('\n').trim(),
+    output: showOutput ? '' : [result.stdout, result.stderr].filter(Boolean).join('\n').trim(),
+    error: result.error ? result.error.message : '',
   };
 }
 
-function installNpmDependencies(cwd, label) {
-  return runCommand(
-    npmCommand,
-    ['install', '--registry', ALIYUN_NPM_REGISTRY, '--no-fund', '--no-audit'],
-    cwd,
-    {
-      npm_config_registry: ALIYUN_NPM_REGISTRY,
+function installNpmDependenciesWithRetry(cwd, label) {
+  console.log(`\n${bold(`Installing ${label} dependencies...`)}`);
+
+  for (const registry of NPM_REGISTRIES) {
+    console.log(`  Trying ${registry.name} mirror: ${registry.url}`);
+    const result = runCommand(
+      npmCommand,
+      ['install', '--registry', registry.url, '--no-fund', '--no-audit'],
+      cwd,
+      { npm_config_registry: registry.url },
+      true
+    );
+
+    if (result.pass && existsSync(join(cwd, 'node_modules'))) {
+      console.log(`  ${green(`✓ ${label} dependencies installed via ${registry.name} mirror`)}`);
+      return { pass: true, registry: registry };
     }
-  );
+
+    console.log(`  ${yellow(`✗ ${registry.name} mirror failed`)}`);
+  }
+
+  return {
+    pass: false,
+    error: 'All npm registries failed. Please check your network connection.',
+  };
 }
 
 function ensureFileFromTemplate(targetPath, templatePath, label, missingFix) {
@@ -92,17 +116,17 @@ function checkDependencies() {
   if (existsSync(join(projectRoot, 'node_modules'))) {
     return { pass: true, label: 'Root dependencies installed' };
   }
-  const installResult = installNpmDependencies(projectRoot, 'root');
+  const installResult = installNpmDependenciesWithRetry(projectRoot, 'root');
   if (installResult.pass && existsSync(join(projectRoot, 'node_modules'))) {
-    return { pass: true, label: 'Root dependencies installed (auto-installed via Aliyun mirror)' };
+    return { pass: true, label: `Root dependencies installed (auto-installed via ${installResult.registry.name} mirror)` };
   }
   return {
     pass: false,
     label: 'Root dependencies not installed',
     fix: [
       '健康检查已尝试自动安装，但未成功。',
-      `Run: npm install --registry=${ALIYUN_NPM_REGISTRY}`,
-      installResult.output || '请检查网络、Node/npm 环境和镜像源可用性。',
+      ...NPM_REGISTRIES.map(({ url }) => `Run: npm install --registry=${url}`),
+      installResult.error || '请检查网络、Node/npm 环境和镜像源可用性。',
     ],
   };
 }
@@ -112,17 +136,17 @@ function checkGuiDependencies() {
   if (existsSync(join(guiRoot, 'node_modules'))) {
     return { pass: true, label: 'GUI dependencies installed' };
   }
-  const installResult = installNpmDependencies(guiRoot, 'gui');
+  const installResult = installNpmDependenciesWithRetry(guiRoot, 'GUI');
   if (installResult.pass && existsSync(join(guiRoot, 'node_modules'))) {
-    return { pass: true, label: 'GUI dependencies installed (auto-installed via Aliyun mirror)' };
+    return { pass: true, label: `GUI dependencies installed (auto-installed via ${installResult.registry.name} mirror)` };
   }
   return {
     pass: false,
     label: 'GUI dependencies not installed',
     fix: [
       '健康检查已尝试自动安装，但未成功。',
-      `Run: cd gui && npm install --registry=${ALIYUN_NPM_REGISTRY}`,
-      installResult.output || '请检查网络、Node/npm 环境和镜像源可用性。',
+      ...NPM_REGISTRIES.map(({ url }) => `Run: cd gui && npm install --registry=${url}`),
+      installResult.error || '请检查网络、Node/npm 环境和镜像源可用性。',
     ],
   };
 }
@@ -140,7 +164,8 @@ async function checkPlaywright() {
     if (existsSync(execPath)) {
       return { pass: true, label: 'Playwright chromium installed' };
     }
-    const installResult = runCommand(npxCommand, ['playwright', 'install', 'chromium'], projectRoot);
+    console.log(`\n${bold('Installing Playwright chromium...')}`);
+    const installResult = runCommand(npxCommand, ['playwright', 'install', 'chromium'], projectRoot, {}, true);
     if (installResult.pass) {
       const refreshedPath = chromium.executablePath();
       if (existsSync(refreshedPath)) {
@@ -157,7 +182,8 @@ async function checkPlaywright() {
       ],
     };
   } catch {
-    const installResult = runCommand(npxCommand, ['playwright', 'install', 'chromium'], projectRoot);
+    console.log(`\n${bold('Installing Playwright chromium...')}`);
+    const installResult = runCommand(npxCommand, ['playwright', 'install', 'chromium'], projectRoot, {}, true);
     if (installResult.pass) {
       return { pass: true, label: 'Playwright chromium installed (auto-installed)' };
     }
