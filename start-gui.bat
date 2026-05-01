@@ -1,5 +1,5 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
 title Career-Ops-GUI-cn Start
 
 set "ROOT=%~dp0"
@@ -29,12 +29,17 @@ if errorlevel 1 (
   exit /b 1
 )
 
-echo [1/4] Running doctor check...
-call npm run doctor
+echo [1/4] Running environment check and installing dependencies...
+echo       This may take a few minutes on first run...
+echo.
+
+call npm run doctor -- --auto-start
 if errorlevel 1 (
   echo.
-  echo [ERROR] Doctor check failed.
-  echo Please read the messages above and try again.
+  echo ==============================================
+  echo [ERROR] Environment check failed.
+  echo Please read the messages above and fix the issues.
+  echo ==============================================
   echo.
   pause
   exit /b 1

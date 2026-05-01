@@ -62,7 +62,7 @@ export default function Dashboard({ onToast }) {
       case 'pass': return <CheckCircle style={{ color: '#16a34a', width: '20px', height: '20px' }} />
       case 'warn': return <AlertCircle style={{ color: '#f59e0b', width: '20px', height: '20px' }} />
       case 'fail': return <AlertCircle style={{ color: '#dc2626', width: '20px', height: '20px' }} />
-      default: return <Activity style={{ color: '#64748b', width: '20px', height: '20px' }} />
+      default: return <Activity style={{ color: '#78716c', width: '20px', height: '20px' }} />
     }
   }
 

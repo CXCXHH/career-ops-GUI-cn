@@ -3,6 +3,7 @@
 /**
  * doctor.mjs — Setup validation for Career-Ops-GUI-cn
  * Checks all prerequisites and prints a pass/fail checklist.
+ * Supports multiple npm registries with automatic fallback.
  */
 
 import { copyFileSync, existsSync, mkdirSync, readdirSync } from 'fs';
@@ -12,15 +13,16 @@ import { spawnSync } from 'child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, '..', '..');
+
 const NPM_REGISTRIES = [
   { name: 'Aliyun', url: 'https://registry.npmmirror.com/' },
   { name: 'Tencent', url: 'https://mirrors.cloud.tencent.com/npm/' },
   { name: 'Official', url: 'https://registry.npmjs.org/' },
 ];
+
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const npxCommand = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 
-// ANSI colors (only on TTY)
 const isTTY = process.stdout.isTTY;
 const green = (s) => isTTY ? `\x1b[32m${s}\x1b[0m` : s;
 const red = (s) => isTTY ? `\x1b[31m${s}\x1b[0m` : s;
@@ -43,15 +45,21 @@ function runCommand(command, args, cwd, extraEnv = {}, showOutput = false) {
   return {
     pass: result.status === 0,
     output: showOutput ? '' : [result.stdout, result.stderr].filter(Boolean).join('\n').trim(),
-    error: result.error ? result.error.message : '',
+    error: result.error ? result.error.message : null,
   };
+}
+
+function testRegistryConnectivity(registryUrl) {
+  const result = runCommand(npmCommand, ['ping', '--registry', registryUrl], projectRoot, {}, false);
+  return result.pass;
 }
 
 function installNpmDependenciesWithRetry(cwd, label) {
   console.log(`\n${bold(`Installing ${label} dependencies...`)}`);
-
+  
   for (const registry of NPM_REGISTRIES) {
     console.log(`  Trying ${registry.name} mirror: ${registry.url}`);
+    
     const result = runCommand(
       npmCommand,
       ['install', '--registry', registry.url, '--no-fund', '--no-audit'],
@@ -62,10 +70,11 @@ function installNpmDependenciesWithRetry(cwd, label) {
 
     if (result.pass && existsSync(join(cwd, 'node_modules'))) {
       console.log(`  ${green(`✓ ${label} dependencies installed via ${registry.name} mirror`)}`);
-      return { pass: true, registry: registry };
+      return { pass: true, registry: registry.name };
     }
 
-    console.log(`  ${yellow(`✗ ${registry.name} mirror failed`)}`);
+    const errorMsg = result.error || (result.output ? `Output: ${result.output}` : '');
+    console.log(`  ${yellow(`✗ ${registry.name} mirror failed${errorMsg ? `: ${errorMsg}` : ''}`)}`);
   }
 
   return {
@@ -117,16 +126,16 @@ function checkDependencies() {
     return { pass: true, label: 'Root dependencies installed' };
   }
   const installResult = installNpmDependenciesWithRetry(projectRoot, 'root');
-  if (installResult.pass && existsSync(join(projectRoot, 'node_modules'))) {
-    return { pass: true, label: `Root dependencies installed (auto-installed via ${installResult.registry.name} mirror)` };
+  if (installResult.pass) {
+    return { pass: true, label: `Root dependencies installed (via ${installResult.registry} mirror)` };
   }
   return {
     pass: false,
     label: 'Root dependencies not installed',
     fix: [
-      '健康检查已尝试自动安装，但未成功。',
-      ...NPM_REGISTRIES.map(({ url }) => `Run: npm install --registry=${url}`),
-      installResult.error || '请检查网络、Node/npm 环境和镜像源可用性。',
+      'Automatic installation failed.',
+      'Please try manually: npm install',
+      installResult.error,
     ],
   };
 }
@@ -137,16 +146,16 @@ function checkGuiDependencies() {
     return { pass: true, label: 'GUI dependencies installed' };
   }
   const installResult = installNpmDependenciesWithRetry(guiRoot, 'GUI');
-  if (installResult.pass && existsSync(join(guiRoot, 'node_modules'))) {
-    return { pass: true, label: `GUI dependencies installed (auto-installed via ${installResult.registry.name} mirror)` };
+  if (installResult.pass) {
+    return { pass: true, label: `GUI dependencies installed (via ${installResult.registry} mirror)` };
   }
   return {
     pass: false,
     label: 'GUI dependencies not installed',
     fix: [
-      '健康检查已尝试自动安装，但未成功。',
-      ...NPM_REGISTRIES.map(({ url }) => `Run: cd gui && npm install --registry=${url}`),
-      installResult.error || '请检查网络、Node/npm 环境和镜像源可用性。',
+      'Automatic installation failed.',
+      'Please try manually: cd gui && npm install',
+      installResult.error,
     ],
   };
 }
@@ -164,6 +173,7 @@ async function checkPlaywright() {
     if (existsSync(execPath)) {
       return { pass: true, label: 'Playwright chromium installed' };
     }
+    
     console.log(`\n${bold('Installing Playwright chromium...')}`);
     const installResult = runCommand(npxCommand, ['playwright', 'install', 'chromium'], projectRoot, {}, true);
     if (installResult.pass) {
@@ -176,9 +186,8 @@ async function checkPlaywright() {
       pass: false,
       label: 'Playwright chromium not installed',
       fix: [
-        '健康检查已尝试自动安装 Chromium，但未成功。',
-        'Run: npx playwright install chromium',
-        installResult.output || '请检查网络环境后重试。',
+        'Automatic installation failed.',
+        'Please try manually: npx playwright install chromium',
       ],
     };
   } catch {
@@ -191,9 +200,8 @@ async function checkPlaywright() {
       pass: false,
       label: 'Playwright chromium not installed',
       fix: [
-        '健康检查已尝试自动安装 Chromium，但未成功。',
-        'Run: npx playwright install chromium',
-        installResult.output || '请检查网络环境后重试。',
+        'Automatic installation failed.',
+        'Please try manually: npx playwright install chromium',
       ],
     };
   }
@@ -274,9 +282,9 @@ function checkAutoDir(name) {
   }
 }
 
-async function main() {
-  console.log('\nCareer-Ops-GUI-cn doctor');
-  console.log('================\n');
+async function runChecks() {
+  console.log('\nCareer-Ops-GUI-cn Doctor Check');
+  console.log('================================\n');
 
   const checks = [
     checkNodeVersion(),
@@ -302,19 +310,34 @@ async function main() {
       console.log(`${red('✗')} ${result.label}`);
       const fixes = Array.isArray(result.fix) ? result.fix : [result.fix];
       for (const hint of fixes) {
-        console.log(`  ${dim('→ ' + hint)}`);
+        if (hint) console.log(`  ${dim('→ ' + hint)}`);
       }
     }
   }
 
   console.log('');
+  return failures;
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  const shouldAutoStart = args.includes('--auto-start');
+  
+  const failures = await runChecks();
+
   if (failures > 0) {
-    console.log(`Result: ${failures} issue${failures === 1 ? '' : 's'} found. Fix them and run \`npm run doctor\` again.`);
+    console.log(`${red(`Result: ${failures} issue${failures === 1 ? '' : 's'} found.`)}`);
+    console.log('Please fix the issues above and run the start script again.\n');
     process.exit(1);
   } else {
-    console.log('Result: All checks passed. You are ready to start the GUI project.');
-    console.log('Suggested next steps: run `npm run api` and `npm run gui:dev`.');
-    process.exit(0);
+    console.log(`${green('Result: All checks passed!')}`);
+    if (shouldAutoStart) {
+      console.log('\nStarting the application...\n');
+      process.exit(0);
+    } else {
+      console.log('You can now run the start script to launch the application.\n');
+      process.exit(0);
+    }
   }
 }
 

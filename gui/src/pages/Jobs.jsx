@@ -342,7 +342,7 @@ export default function Jobs({ onToast }) {
                 onChange={(e) => setSearchCompany(e.target.value)}
                 style={{ width: '180px', paddingRight: '30px' }}
               />
-              <Search style={{ position: 'absolute', right: '8px', width: '14px', height: '14px', color: '#94a3b8' }} />
+              <Search style={{ position: 'absolute', right: '8px', width: '14px', height: '14px', color: '#a8a29e' }} />
             </div>
           </div>
           <div className="btn-group">
@@ -473,9 +473,9 @@ export default function Jobs({ onToast }) {
                   disabled={filteredJobs.length === 0}
                 >
                   {selectedIds.size === filteredJobs.length && filteredJobs.length > 0 ? (
-                    <CheckSquare style={{ width: '18px', height: '18px', color: '#2563eb' }} />
+                    <CheckSquare style={{ width: '18px', height: '18px', color: '#6b1d1d' }} />
                   ) : (
-                    <Square style={{ width: '18px', height: '18px', color: '#94a3b8' }} />
+                    <Square style={{ width: '18px', height: '18px', color: '#a8a29e' }} />
                   )}
                 </button>
               </th>
@@ -503,9 +503,9 @@ export default function Jobs({ onToast }) {
                     onClick={() => handleSelectOne(job.id)}
                   >
                     {selectedIds.has(job.id) ? (
-                      <CheckSquare style={{ width: '16px', height: '16px', color: '#2563eb' }} />
+                      <CheckSquare style={{ width: '16px', height: '16px', color: '#6b1d1d' }} />
                     ) : (
-                      <Square style={{ width: '16px', height: '16px', color: '#cbd5e1' }} />
+                      <Square style={{ width: '16px', height: '16px', color: '#d6d3d1' }} />
                     )}
                   </button>
                 </td>
@@ -515,7 +515,7 @@ export default function Jobs({ onToast }) {
                 <td>{job.job_level || job.experience || job.parsed?.job_level || '-'}</td>
                 <td>{job.salary || '-'}</td>
                 <td>{job.location || '-'}</td>
-                <td style={{ fontSize: '12px', color: '#64748b' }}>{job.discovered_at ? new Date(job.discovered_at).toLocaleDateString('zh-CN') : '-'}</td>
+                <td style={{ fontSize: '12px', color: '#78716c' }}>{job.discovered_at ? new Date(job.discovered_at).toLocaleDateString('zh-CN') : '-'}</td>
                 <td>
                   <span className={`status-badge ${statusClass(job.liveness_status)}`}>
                     {statusLabel(job.liveness_status)}
@@ -525,7 +525,7 @@ export default function Jobs({ onToast }) {
                   {job.score ? (
                     <div>
                       <strong>{job.score}/5</strong>
-                      {job.recommendation && <div style={{ color: '#64748b', fontSize: '12px' }}>{job.recommendation}</div>}
+                      {job.recommendation && <div style={{ color: '#78716c', fontSize: '12px' }}>{job.recommendation}</div>}
                     </div>
                   ) : '-'}
                 </td>
@@ -595,7 +595,7 @@ export default function Jobs({ onToast }) {
                     <div className="form-group">
                       <label>有效性状态</label>
                       <div><span className={`status-badge ${statusClass(selectedJob.liveness_status)}`}>{statusLabel(selectedJob.liveness_status)}</span>
-                        {selectedJob.liveness_reason && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#64748b' }}>{selectedJob.liveness_reason}</span>}
+                        {selectedJob.liveness_reason && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#78716c' }}>{selectedJob.liveness_reason}</span>}
                       </div>
                     </div>
                     <div className="form-group">
@@ -692,7 +692,7 @@ export default function Jobs({ onToast }) {
                     <div className="form-group">
                       <label>AI 优化后的 JD（用于评分和简历生成）</label>
                       <textarea className="form-control" rows="8" value={selectedJob.ai_optimized_jd} readOnly style={{ fontSize: '12px' }} />
-                      <div style={{ marginTop: '6px', fontSize: '12px', color: '#64748b' }}>
+                      <div style={{ marginTop: '6px', fontSize: '12px', color: '#78716c' }}>
                         置信度：{selectedJob.ai_jd_confidence || '-'} · 模型：{selectedJob.ai_jd_model || '-'}
                         {selectedJob.ai_jd_liveness_status ? ` · 状态判断：${selectedJob.ai_jd_liveness_status}` : ''}
                       </div>

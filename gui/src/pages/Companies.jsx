@@ -230,9 +230,9 @@ export default function Companies({ onToast }) {
                   disabled={filteredCompanies.length === 0}
                 >
                   {selectedIds.size === filteredCompanies.length && filteredCompanies.length > 0 ? (
-                    <CheckSquare style={{ width: '18px', height: '18px', color: '#2563eb' }} />
+                    <CheckSquare style={{ width: '18px', height: '18px', color: '#6b1d1d' }} />
                   ) : (
-                    <Square style={{ width: '18px', height: '18px', color: '#94a3b8' }} />
+                    <Square style={{ width: '18px', height: '18px', color: '#a8a29e' }} />
                   )}
                 </button>
               </th>
@@ -255,15 +255,15 @@ export default function Companies({ onToast }) {
                     onClick={() => handleSelectOne(company.id)}
                   >
                     {selectedIds.has(company.id) ? (
-                      <CheckSquare style={{ width: '16px', height: '16px', color: '#2563eb' }} />
+                      <CheckSquare style={{ width: '16px', height: '16px', color: '#6b1d1d' }} />
                     ) : (
-                      <Square style={{ width: '16px', height: '16px', color: '#cbd5e1' }} />
+                      <Square style={{ width: '16px', height: '16px', color: '#d6d3d1' }} />
                     )}
                   </button>
                 </td>
                 <td>
                   <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <Building2 style={{ width: '18px', height: '18px', marginRight: '8px', color: '#2563eb' }} />
+                    <Building2 style={{ width: '18px', height: '18px', marginRight: '8px', color: '#6b1d1d' }} />
                     {company.name}
                   </div>
                 </td>
@@ -281,7 +281,7 @@ export default function Companies({ onToast }) {
                 <td>
                   {company.locations && company.locations.length > 0 ? (
                     <div style={{ display: 'flex', alignItems: 'center' }}>
-                      <MapPin style={{ width: '14px', height: '14px', marginRight: '4px', color: '#64748b' }} />
+                      <MapPin style={{ width: '14px', height: '14px', marginRight: '4px', color: '#78716c' }} />
                       {company.locations.join(', ')}
                     </div>
                   ) : (

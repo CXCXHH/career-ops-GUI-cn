@@ -23,7 +23,7 @@ export default function Sidebar() {
     <aside className="sidebar">
       <div className="sidebar-header">
         <h1>Career Ops</h1>
-        <p style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>工作筛选器</p>
+        <p style={{ fontSize: '12px', color: '#a8a29e', marginTop: '4px' }}>工作筛选器</p>
       </div>
       <nav className="sidebar-nav">
         <ul>

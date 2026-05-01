@@ -355,7 +355,7 @@ function ModuleItem({ module, index, onToggle, onEdit, onDelete, onEditData, onD
       className={`module-item ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
     >
       <GripVertical className="drag-handle" />
-      <span className="module-name" style={{ color: module.enabled ? undefined : '#94a3b8' }}>
+      <span className="module-name" style={{ color: module.enabled ? undefined : '#a8a29e' }}>
         {module.name}
         {module.type === 'custom' && <span className="custom-badge">自定义</span>}
       </span>
@@ -673,7 +673,7 @@ function PreviewModal({ profile, education, experience, projects, modules, photo
             <div className="empty-state" style={{ minHeight: '320px' }}>
               <FileText size={32} />
               <p>暂无可预览内容</p>
-              <p style={{ fontSize: '13px', color: '#64748b' }}>先填写基本信息、教育背景、项目经历或自定义模块内容，再预览简历。</p>
+              <p style={{ fontSize: '13px', color: '#78716c' }}>先填写基本信息、教育背景、项目经历或自定义模块内容，再预览简历。</p>
             </div>
           ) : (
             <>
@@ -1288,7 +1288,7 @@ export default function ResumeBuilder({ onToast }) {
                     删除照片
                   </button>
                 )}
-                <div style={{ marginTop: '8px', fontSize: '12px', color: '#64748b', textAlign: 'center' }}>
+                <div style={{ marginTop: '8px', fontSize: '12px', color: '#78716c', textAlign: 'center' }}>
                   支持 PNG/JPG，保存基本信息后会用于预览和简历导出
                 </div>
               </div>
