@@ -483,9 +483,9 @@ export default function Discovery({ onToast }) {
           style={{ 
             marginBottom: '12px', 
             padding: '20px', 
-            border: `2px dashed ${isDragging ? '#6b1d1d' : '#d6d3d1'}`,
+            border: `2px dashed ${isDragging ? 'var(--primary-color)' : 'var(--border-light)'}`,
             borderRadius: '8px',
-            backgroundColor: isDragging ? '#faf5f5' : '#f5f3ef',
+            backgroundColor: isDragging ? 'var(--primary-tint)' : 'var(--bg-secondary)',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -495,7 +495,7 @@ export default function Discovery({ onToast }) {
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
-          <Upload style={{ width: '24px', height: '24px', marginBottom: '8px', color: isDragging ? '#6b1d1d' : '#78716c' }} />
+          <Upload style={{ width: '24px', height: '24px', marginBottom: '8px', color: isDragging ? 'var(--primary-color)' : 'var(--text-secondary)' }} />
           <label className="btn btn-secondary" style={{ cursor: 'pointer' }}>
             {isFileImporting ? '导入中...' : '选择 JSON 文件'}
             <input
@@ -508,16 +508,16 @@ export default function Discovery({ onToast }) {
           </label>
           {isFileImporting && importProgress > 0 && (
             <div style={{ width: '100%', marginTop: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '12px', color: '#78716c' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '12px', color: 'var(--text-secondary)' }}>
                 <span>导入进度</span>
                 <span>{importProgress}%</span>
               </div>
-              <div style={{ height: '6px', backgroundColor: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
+              <div style={{ height: '6px', backgroundColor: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden' }}>
                 <div 
                   style={{ 
                     height: '100%', 
                     width: `${importProgress}%`, 
-                    backgroundColor: '#6b1d1d',
+                    backgroundColor: 'var(--primary-color)',
                     transition: 'width 0.3s ease'
                   }} 
                 />
@@ -532,7 +532,7 @@ export default function Discovery({ onToast }) {
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <h3 className="card-title">岗位搜索结果</h3>
-              <span style={{ color: '#78716c', fontSize: '13px', marginLeft: '12px' }}>{discoveredJobs.length} 个</span>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '13px', marginLeft: '12px' }}>{discoveredJobs.length} 个</span>
             </div>
             {discoveredJobs.length > 0 && (
               <div className="btn-group">
@@ -558,9 +558,9 @@ export default function Discovery({ onToast }) {
               <th style={{ width: '40px' }}>
                 <button className="btn btn-link p-0" onClick={handleSelectAllJobs}>
                   {selectedJobs.size === discoveredJobs.length && discoveredJobs.length > 0 ? (
-                    <CheckSquare style={{ width: '18px', height: '18px', color: '#6b1d1d' }} />
+                    <CheckSquare style={{ width: '18px', height: '18px', color: 'var(--primary-color)' }} />
                   ) : (
-                    <Square style={{ width: '18px', height: '18px', color: '#a8a29e' }} />
+                    <Square style={{ width: '18px', height: '18px', color: 'var(--text-muted)' }} />
                   )}
                 </button>
               </th>
@@ -582,9 +582,9 @@ export default function Discovery({ onToast }) {
                     onClick={() => handleJobSelect(job.id)}
                   >
                     {selectedJobs.has(job.id) ? (
-                      <CheckSquare style={{ width: '18px', height: '18px', color: '#6b1d1d' }} />
+                      <CheckSquare style={{ width: '18px', height: '18px', color: 'var(--primary-color)' }} />
                     ) : (
-                      <Square style={{ width: '18px', height: '18px', color: '#a8a29e' }} />
+                      <Square style={{ width: '18px', height: '18px', color: 'var(--text-muted)' }} />
                     )}
                   </button>
                 </td>
@@ -592,7 +592,7 @@ export default function Discovery({ onToast }) {
                 <td>{job.title || '-'}</td>
                 <td>
                   {job.salary || '-'}
-                  {job.salary && <span style={{ fontSize: '10px', color: '#a8a29e' }}> (来源：网页抓取)</span>}
+                  {job.salary && <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}> (来源：网页抓取)</span>}
                 </td>
                 <td>{job.location || '-'}</td>
                 <td>

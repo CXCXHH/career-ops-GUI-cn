@@ -4,10 +4,10 @@ import { followupsAPI } from '../api'
 import { showToast } from '../utils/toast'
 
 const URGENCY_CONFIG = {
-  urgent: { label: '紧急', color: '#b91c1c', bg: '#fef2f2', icon: Flame },
-  overdue: { label: '逾期', color: '#b45309', bg: '#fef7ed', icon: AlertTriangle },
-  waiting: { label: '等待中', color: '#6b1d1d', bg: '#faf5f5', icon: Clock },
-  cold: { label: '已冷却', color: '#78716c', bg: '#f5f3ef', icon: Snowflake },
+  urgent: { label: '紧急', color: 'var(--danger-color)', bg: 'var(--danger-tint)', icon: Flame },
+  overdue: { label: '逾期', color: 'var(--warning-color)', bg: 'var(--warning-tint)', icon: AlertTriangle },
+  waiting: { label: '等待中', color: 'var(--primary-color)', bg: 'var(--primary-tint)', icon: Clock },
+  cold: { label: '已冷却', color: 'var(--text-secondary)', bg: 'var(--bg-secondary)', icon: Snowflake },
 }
 
 const STATUS_LABELS = {
@@ -139,7 +139,7 @@ export default function Followups({ onToast }) {
       <div className="card">
         <div className="card-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Filter style={{ width: '14px', height: '14px', color: '#a8a29e' }} />
+            <Filter style={{ width: '14px', height: '14px', color: 'var(--text-muted)' }} />
             <select value={filterUrgency} onChange={(e) => setFilterUrgency(e.target.value)} className="form-control" style={{ width: '120px' }}>
               <option value="all">全部</option>
               <option value="urgent">紧急</option>
@@ -176,13 +176,13 @@ export default function Followups({ onToast }) {
                   <td style={{ fontWeight: 500 }}>{followup.company}</td>
                   <td>{followup.role}</td>
                   <td>
-                    <span className="tag" style={{ background: '#f5f3ef', color: '#292524' }}>
+                    <span className="tag" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
                       {STATUS_LABELS[followup.last_status] || followup.last_status}
                     </span>
                   </td>
                   <td>{followup.followup_count ?? 0} 次</td>
                   <td>{followup.days_since_application ?? '-'} 天</td>
-                  <td style={{ fontSize: '13px', color: '#78716c' }}>{followup.next_followup_date || '-'}</td>
+                  <td style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{followup.next_followup_date || '-'}</td>
                   <td>
                     <span style={{
                       display: 'inline-flex', alignItems: 'center', gap: '4px',
@@ -215,7 +215,7 @@ export default function Followups({ onToast }) {
           <div className="empty-state">
             <Bell />
             <p>暂无跟进任务</p>
-            <p style={{ fontSize: '13px', color: '#a8a29e' }}>请先在「投递追踪」页面添加投递记录</p>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>请先在「投递追踪」页面添加投递记录</p>
           </div>
         )}
         {followups.length > 0 && sortedFollowups.length === 0 && (

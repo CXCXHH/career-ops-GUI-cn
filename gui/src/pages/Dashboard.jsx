@@ -59,10 +59,10 @@ export default function Dashboard({ onToast }) {
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'pass': return <CheckCircle style={{ color: '#16a34a', width: '20px', height: '20px' }} />
-      case 'warn': return <AlertCircle style={{ color: '#f59e0b', width: '20px', height: '20px' }} />
-      case 'fail': return <AlertCircle style={{ color: '#dc2626', width: '20px', height: '20px' }} />
-      default: return <Activity style={{ color: '#78716c', width: '20px', height: '20px' }} />
+      case 'pass': return <CheckCircle style={{ color: 'var(--success-color)', width: '20px', height: '20px' }} />
+      case 'warn': return <AlertCircle style={{ color: 'var(--warning-color)', width: '20px', height: '20px' }} />
+      case 'fail': return <AlertCircle style={{ color: 'var(--danger-color)', width: '20px', height: '20px' }} />
+      default: return <Activity style={{ color: 'var(--text-secondary)', width: '20px', height: '20px' }} />
     }
   }
 

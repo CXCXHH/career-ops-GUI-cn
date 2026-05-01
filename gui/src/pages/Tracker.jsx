@@ -163,7 +163,7 @@ export default function Tracker({ onToast }) {
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             {selectedIds.size > 0 && (
               <>
-                <span style={{ color: '#78716c', fontSize: '13px' }}>已选 {selectedIds.size} 项</span>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>已选 {selectedIds.size} 项</span>
                 <button className="btn btn-danger btn-sm" onClick={handleBatchDelete} disabled={isBatchDeleting}>
                   批量删除{isBatchDeleting ? '中...' : ''}
                 </button>
@@ -278,10 +278,10 @@ export default function Tracker({ onToast }) {
             </div>
             <div className="modal-body-scroll">
               {!reportJob && (
-                <div style={{ padding: '24px', textAlign: 'center', color: '#78716c' }}>加载中...</div>
+                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>加载中...</div>
               )}
               {reportJob && (!reportJob.score && !reportJob.score_reason) && (
-                <div style={{ padding: '12px', background: '#fef3c7', borderRadius: '6px', fontSize: '13px', color: '#94000e' }}>
+                <div style={{ padding: '12px', background: 'var(--warning-tint)', borderRadius: '6px', fontSize: '13px', color: 'var(--danger-color)' }}>
                   该岗位尚未进行 AI 评分
                 </div>
               )}

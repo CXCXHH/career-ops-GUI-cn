@@ -230,9 +230,9 @@ export default function Companies({ onToast }) {
                   disabled={filteredCompanies.length === 0}
                 >
                   {selectedIds.size === filteredCompanies.length && filteredCompanies.length > 0 ? (
-                    <CheckSquare style={{ width: '18px', height: '18px', color: '#6b1d1d' }} />
+                    <CheckSquare style={{ width: '18px', height: '18px', color: 'var(--primary-color)' }} />
                   ) : (
-                    <Square style={{ width: '18px', height: '18px', color: '#a8a29e' }} />
+                    <Square style={{ width: '18px', height: '18px', color: 'var(--text-muted)' }} />
                   )}
                 </button>
               </th>
@@ -255,15 +255,15 @@ export default function Companies({ onToast }) {
                     onClick={() => handleSelectOne(company.id)}
                   >
                     {selectedIds.has(company.id) ? (
-                      <CheckSquare style={{ width: '16px', height: '16px', color: '#6b1d1d' }} />
+                      <CheckSquare style={{ width: '16px', height: '16px', color: 'var(--primary-color)' }} />
                     ) : (
-                      <Square style={{ width: '16px', height: '16px', color: '#d6d3d1' }} />
+                      <Square style={{ width: '16px', height: '16px', color: 'var(--border-light)' }} />
                     )}
                   </button>
                 </td>
                 <td>
                   <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <Building2 style={{ width: '18px', height: '18px', marginRight: '8px', color: '#6b1d1d' }} />
+                    <Building2 style={{ width: '18px', height: '18px', marginRight: '8px', color: 'var(--primary-color)' }} />
                     {company.name}
                   </div>
                 </td>
@@ -281,7 +281,7 @@ export default function Companies({ onToast }) {
                 <td>
                   {company.locations && company.locations.length > 0 ? (
                     <div style={{ display: 'flex', alignItems: 'center' }}>
-                      <MapPin style={{ width: '14px', height: '14px', marginRight: '4px', color: '#78716c' }} />
+                      <MapPin style={{ width: '14px', height: '14px', marginRight: '4px', color: 'var(--text-secondary)' }} />
                       {company.locations.join(', ')}
                     </div>
                   ) : (
@@ -414,7 +414,7 @@ export default function Companies({ onToast }) {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <AlertTriangle style={{ width: '24px', height: '24px', color: '#f59e0b' }} />
+                <AlertTriangle style={{ width: '24px', height: '24px', color: 'var(--warning-color)' }} />
                 <h3>确认批量删除</h3>
               </div>
               <button className="btn btn-close" onClick={() => setShowConfirmModal(false)}>×</button>
@@ -423,7 +423,7 @@ export default function Companies({ onToast }) {
               <p style={{ marginBottom: '12px' }}>
                 您即将删除 <strong>{selectedIds.size}</strong> 家公司。此操作将把这些公司标记为已删除，且无法撤销。
               </p>
-              <p style={{ color: '#dc2626', fontSize: '13px' }}>
+              <p style={{ color: 'var(--danger-color)', fontSize: '13px' }}>
                 删除后，这些公司将从公司库中移除，并防止后续重新被自动发现。
               </p>
             </div>

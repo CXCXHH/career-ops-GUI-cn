@@ -1,0 +1,44 @@
+/*
+ * Career-Ops-GUI-cn 设计变量
+ * 修改此文件即可全局调整配色、字体、阴影
+ * 变量分类见 design.md
+ */
+
+:root {
+  /* ── 主色 ── */
+  --primary-color: #6b1d1d;
+  --primary-hover: #7a2525;
+  --primary-tint: #faf5f5;
+
+  /* ── 状态色 ── */
+  --success-color: #15803d;
+  --success-tint: #ecfdf5;
+  --warning-color: #b45309;
+  --warning-tint: #fef7ed;
+  --danger-color: #b91c1c;
+  --danger-tint: #fef2f2;
+  --info-color: #0e7490;
+
+  /* ── 装饰 ── */
+  --accent-gold: #b8a88a;
+
+  /* ── 背景 ── */
+  --bg-primary: #faf9f7;
+  --bg-secondary: #f5f3ef;
+  --bg-sidebar: #1c1917;
+
+  /* ── 文字 ── */
+  --text-primary: #292524;
+  --text-secondary: #78716c;
+  --text-muted: #a8a29e;
+  --text-disabled: #d6d3d1;
+
+  /* ── 边框 ── */
+  --border-color: #e7e5e4;
+  --border-light: #d6d3d1;
+
+  /* ── 阴影（暖色调） ── */
+  --shadow-sm: 0 1px 2px rgba(41, 37, 36, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(41, 37, 36, 0.08);
+  --shadow-lg: 0 10px 15px -3px rgba(41, 37, 36, 0.1);
+}

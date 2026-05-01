@@ -1,21 +1,4 @@
-:root {
-  --primary-color: #6b1d1d;
-  --primary-hover: #7a2525;
-  --success-color: #15803d;
-  --warning-color: #b45309;
-  --danger-color: #b91c1c;
-  --info-color: #0e7490;
-  --accent-gold: #b8a88a;
-  --bg-primary: #faf9f7;
-  --bg-secondary: #f5f3ef;
-  --bg-sidebar: #1c1917;
-  --text-primary: #292524;
-  --text-secondary: #78716c;
-  --border-color: #e7e5e4;
-  --shadow-sm: 0 1px 2px rgba(41, 37, 36, 0.06);
-  --shadow-md: 0 4px 6px -1px rgba(41, 37, 36, 0.08);
-  --shadow-lg: 0 10px 15px -3px rgba(41, 37, 36, 0.1);
-}
+@import './variables.css';
 
 * {
   margin: 0;
@@ -83,7 +66,7 @@ h1, h2, h3, h4 {
   display: flex;
   align-items: center;
   padding: 10px 12px;
-  color: #a8a29e;
+  color: var(--text-muted);
   text-decoration: none;
   border-radius: 6px;
   transition: all 0.2s;
@@ -172,8 +155,8 @@ h1, h2, h3, h4 {
   margin-top: 16px;
   padding: 10px 12px;
   border-radius: 6px;
-  background: #f0fdfa;
-  color: #0e7490;
+  background: var(--success-tint);
+  color: var(--info-color);
   font-size: 13px;
 }
 
@@ -302,7 +285,7 @@ h1, h2, h3, h4 {
 }
 
 .btn-secondary:hover {
-  background-color: #e2e8f0;
+  background-color: var(--border-color);
 }
 
 .btn-success {
@@ -352,23 +335,23 @@ h1, h2, h3, h4 {
 }
 
 .status-active {
-  background-color: #ecfdf5;
-  color: #15803d;
+  background-color: var(--success-tint);
+  color: var(--success-color);
 }
 
 .status-closed {
-  background-color: #fef2f2;
-  color: #b91c1c;
+  background-color: var(--danger-tint);
+  color: var(--danger-color);
 }
 
 .status-unconfirmed {
-  background-color: #fef7ed;
-  color: #b45309;
+  background-color: var(--warning-tint);
+  color: var(--warning-color);
 }
 
 .status-error {
-  background-color: #fef2f2;
-  color: #b91c1c;
+  background-color: var(--danger-tint);
+  color: var(--danger-color);
 }
 
 .table {
@@ -936,7 +919,7 @@ input.form-input[type="month"] {
 }
 
 .module-item:hover {
-  background: #f8fafc;
+  background: var(--bg-secondary);
 }
 
 .module-item.dragging {
@@ -993,7 +976,7 @@ input.form-input[type="month"] {
 }
 
 .action-btn.danger:hover {
-  background: #fee2e2;
+  background: var(--danger-tint);
   color: var(--danger-color);
 }
 
@@ -1100,7 +1083,7 @@ input.form-input[type="month"] {
 }
 
 .file-list a {
-  color: #6b1d1d;
+  color: var(--primary-color);
   text-decoration: none;
 }
 
@@ -1221,7 +1204,7 @@ input.form-input[type="month"] {
 }
 
 .preview-modal {
-  background: #f1f5f9;
+  background: var(--bg-secondary);
   border-radius: 12px;
   width: min(920px, 100%);
   max-height: 88vh;
@@ -1242,7 +1225,7 @@ input.form-input[type="month"] {
   max-width: 100%;
   margin: 0 auto;
   background: #fff;
-  color: #292524;
+  color: var(--text-primary);
   padding: 5mm 16mm;
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
 }
@@ -1291,7 +1274,7 @@ input.form-input[type="month"] {
 }
 
 .resume-preview-section-title {
-  color: #000;
+  color: var(--text-primary);
   font-weight: 700;
   font-size: 14px;
   text-align: center;
@@ -1306,7 +1289,7 @@ input.form-input[type="month"] {
 .resume-preview-section-title .line {
   flex: 1;
   height: 0;
-  border-top: 1px solid #999;
+  border-top: 1px solid var(--text-muted);
 }
 
 .resume-preview-paragraph {
@@ -1323,7 +1306,7 @@ input.form-input[type="month"] {
 
 .resume-preview-skill-item {
   font-size: 12px;
-  color: #292524;
+  color: var(--text-primary);
 }
 
 .resume-preview-item {

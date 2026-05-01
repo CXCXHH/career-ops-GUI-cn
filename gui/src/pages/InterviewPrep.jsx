@@ -8,19 +8,19 @@ function ScoreRing({ score, label }) {
   const circumference = 2 * Math.PI * radius
   const pct = Math.min(100, Math.max(0, Number(score) || 0))
   const offset = circumference - (pct / 100) * circumference
-  const color = pct >= 80 ? '#15803d' : pct >= 60 ? '#b45309' : '#b91c1c'
+  const color = pct >= 80 ? 'var(--success-color)' : pct >= 60 ? 'var(--warning-color)' : 'var(--danger-color)'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
       <svg width="100" height="100" viewBox="0 0 100 100">
-        <circle cx="50" cy="50" r={radius} fill="none" stroke="#e7e5e4" strokeWidth="8" />
+        <circle cx="50" cy="50" r={radius} fill="none" stroke="var(--border-color)" strokeWidth="8" />
         <circle cx="50" cy="50" r={radius} fill="none" stroke={color} strokeWidth="8"
           strokeDasharray={circumference} strokeDashoffset={offset}
           strokeLinecap="round" transform="rotate(-90 50 50)" style={{ transition: 'stroke-dashoffset 1s ease' }} />
         <text x="50" y="54" textAnchor="middle" fontSize="22" fontWeight="bold" fill={color}>{score}</text>
-        <text x="50" y="70" textAnchor="middle" fontSize="10" fill="#a8a29e">/100</text>
+        <text x="50" y="70" textAnchor="middle" fontSize="10" fill="var(--text-muted)">/100</text>
       </svg>
-      <span style={{ fontSize: '13px', color: '#78716c', fontWeight: 500 }}>{label}</span>
+      <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 500 }}>{label}</span>
     </div>
   )
 }
@@ -32,7 +32,7 @@ function SectionCard({ icon: Icon, title, badge, children, defaultOpen = true })
       <div className="card-header" style={{ cursor: 'pointer', userSelect: 'none' }}
         onClick={() => setOpen(!open)}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Icon style={{ width: '18px', height: '18px', color: '#6b1d1d' }} />
+          <Icon style={{ width: '18px', height: '18px', color: 'var(--primary-color)' }} />
           <div className="card-title">{title}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -59,19 +59,19 @@ function QuestionCard({ q, a, index, completed, onToggle, category, difficulty, 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
             <span style={{ fontWeight: 'bold', fontSize: '15px' }}>Q{index + 1}: {q}</span>
-            {category && <span className="tag" style={{ fontSize: '11px', background: '#faf5f5', color: '#6b1d1d' }}>{category}</span>}
+            {category && <span className="tag" style={{ fontSize: '11px', background: 'var(--primary-tint)', color: 'var(--primary-color)' }}>{category}</span>}
             {difficulty && <span className="tag" style={{
               fontSize: '11px',
-              background: difficulty === '高级' ? '#fef2f2' : difficulty === '中级' ? '#fffbeb' : '#f0fdf4',
-              color: difficulty === '高级' ? '#dc2626' : difficulty === '中级' ? '#d97706' : '#16a34a'
+              background: difficulty === '高级' ? 'var(--danger-tint)' : difficulty === '中级' ? 'var(--warning-tint)' : 'var(--success-tint)',
+              color: difficulty === '高级' ? 'var(--danger-color)' : difficulty === '中级' ? 'var(--warning-color)' : 'var(--success-color)'
             }}>{difficulty}</span>}
           </div>
-          <div style={{ background: '#f5f3ef', borderRadius: '6px', padding: '12px', fontSize: '14px', lineHeight: '1.7', color: '#292524' }}>
-            <div style={{ fontWeight: 600, fontSize: '12px', color: '#6b1d1d', marginBottom: '4px' }}>建议回答方向：</div>
+          <div style={{ background: 'var(--bg-secondary)', borderRadius: '6px', padding: '12px', fontSize: '14px', lineHeight: '1.7', color: 'var(--text-primary)' }}>
+            <div style={{ fontWeight: 600, fontSize: '12px', color: 'var(--primary-color)', marginBottom: '4px' }}>建议回答方向：</div>
             {a}
           </div>
           {tips && (
-            <div style={{ marginTop: '6px', fontSize: '12px', color: '#059669', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--success-color)', display: 'flex', alignItems: 'center', gap: '4px' }}>
               <Lightbulb size={13} /> 加分技巧: {tips}
             </div>
           )}
@@ -331,7 +331,7 @@ export default function InterviewPrep({ onToast }) {
           <div className="empty-state">
             <div className="spinner" style={{ margin: '0 auto' }}></div>
             <p>正在深度分析简历与岗位匹配度...</p>
-            <p style={{ fontSize: '12px', color: '#a8a29e' }}>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
               已耗时 {generationElapsed} 秒 · {generationHint()}
             </p>
           </div>
@@ -341,14 +341,14 @@ export default function InterviewPrep({ onToast }) {
           <div className="empty-state">
             <Briefcase />
             <p>暂无已评估的岗位</p>
-            <p style={{ fontSize: '13px', color: '#a8a29e' }}>请先在「岗位列表」页面进行 AI 评估</p>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>请先在「岗位列表」页面进行 AI 评估</p>
           </div>
         )}
       </div>
 
       {!interviewPrep && !isGenerating && jobs.length > 0 && (
         <div className="empty-state">
-          <Target style={{ width: '48px', height: '48px', color: '#d6d3d1' }} />
+          <Target style={{ width: '48px', height: '48px', color: 'var(--text-disabled)' }} />
           <p style={{ fontSize: '15px' }}>选择岗位后点击「生成面试准备」，AI 将为你生成完整的面试准备报告</p>
         </div>
       )}
@@ -360,12 +360,12 @@ export default function InterviewPrep({ onToast }) {
             <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: '20px' }}>
               <ScoreRing score={data.match_score} label={data.match_level || '匹配度'} />
               <div style={{ flex: 1, minWidth: '280px' }}>
-                <h4 style={{ margin: '0 0 8px', color: '#000' }}>岗位分析摘要</h4>
-                <p style={{ fontSize: '14px', lineHeight: '1.8', color: '#292524', whiteSpace: 'pre-wrap' }}>
+                <h4 style={{ margin: '0 0 8px', color: 'var(--text-primary)' }}>岗位分析摘要</h4>
+                <p style={{ fontSize: '14px', lineHeight: '1.8', color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>
                   {data.job_analysis || '(暂无数据)'}
                 </p>
                 {data.provider_label && (
-                  <p style={{ fontSize: '11px', color: '#a8a29e', marginTop: '8px' }}>
+                  <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>
                     由 {data.provider_label} ({data.model}) 生成 · {data.generated_at?.substring(0, 19)}
                   </p>
                 )}
@@ -379,22 +379,22 @@ export default function InterviewPrep({ onToast }) {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px' }}>
                 {data.strengths.map((s, i) => (
                   <div key={i} style={{
-                    borderLeft: '4px solid #16a34a', background: '#f0fdf4', borderRadius: '0 8px 8px 0',
+                    borderLeft: '4px solid var(--success-color)', background: 'var(--success-tint)', borderRadius: '0 8px 8px 0',
                     padding: '14px 16px'
                   }}>
-                    <div style={{ fontWeight: 'bold', color: '#15803d', marginBottom: '6px', fontSize: '15px' }}>
+                    <div style={{ fontWeight: 'bold', color: 'var(--success-color)', marginBottom: '6px', fontSize: '15px' }}>
                       优势 {i + 1}: {s.area}
                     </div>
-                    <div style={{ fontSize: '14px', lineHeight: '1.7', color: '#292524', marginBottom: '6px' }}>{s.detail}</div>
+                    <div style={{ fontSize: '14px', lineHeight: '1.7', color: 'var(--text-primary)', marginBottom: '6px' }}>{s.detail}</div>
                     {s.evidence && (
-                      <div style={{ fontSize: '12px', color: '#78716c', background: '#fff', padding: '6px 10px', borderRadius: '4px' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', background: '#fff', padding: '6px 10px', borderRadius: '4px' }}>
                         证据: {s.evidence}
                       </div>
                     )}
                   </div>
                 ))}
               </div>
-            ) : <p style={{ color: '#a8a29e', textAlign: 'center', padding: '20px' }}>(暂无数据)</p>}
+            ) : <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>(暂无数据)</p>}
           </SectionCard>
 
           {/* ===== 潜在短板与改进 ===== */}
@@ -402,24 +402,24 @@ export default function InterviewPrep({ onToast }) {
             {Array.isArray(data.weaknesses) && data.weaknesses.length > 0 ? (
               data.weaknesses.map((w, i) => (
                 <div key={i} style={{
-                  borderBottom: i < data.weaknesses.length - 1 ? '1px solid #e7e5e4' : 'none',
+                  borderBottom: i < data.weaknesses.length - 1 ? '1px solid var(--border-color)' : 'none',
                   padding: '12px 0'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                     <span style={{ fontWeight: 'bold', fontSize: '15px' }}>{w.gap}</span>
                     <span style={{
                       fontSize: '11px', padding: '2px 8px', borderRadius: '10px',
-                      background: w.severity === '高' ? '#fef2f2' : w.severity === '中' ? '#fffbeb' : '#f0fdf4',
-                      color: w.severity === '高' ? '#dc2626' : w.severity === '中' ? '#d97706' : '#16a34a'
+                      background: w.severity === '高' ? 'var(--danger-tint)' : w.severity === '中' ? 'var(--warning-tint)' : 'var(--success-tint)',
+                      color: w.severity === '高' ? 'var(--danger-color)' : w.severity === '中' ? 'var(--warning-color)' : 'var(--success-color)'
                     }}>{w.severity || '中'}风险</span>
                   </div>
-                  <div style={{ fontSize: '14px', color: '#059669', marginLeft: '8px' }}>
+                  <div style={{ fontSize: '14px', color: 'var(--success-color)', marginLeft: '8px' }}>
                     <Lightbulb size={14} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
                     改进建议: {w.improvement || '-'}
                   </div>
                 </div>
               ))
-            ) : <p style={{ color: '#a8a29e', textAlign: 'center', padding: '20px' }}>(暂无数据)</p>}
+            ) : <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>(暂无数据)</p>}
           </SectionCard>
 
           {/* ===== 必讲项目推荐 ===== */}
@@ -427,16 +427,16 @@ export default function InterviewPrep({ onToast }) {
             {Array.isArray(data.must_talk_projects) && data.must_talk_projects.length > 0 ? (
               data.must_talk_projects.map((p, i) => (
                 <div key={i} style={{
-                  background: '#fafafa', borderRadius: '8px', padding: '16px', marginBottom: '12px',
-                  border: '1px solid #e7e5e4'
+                  background: 'var(--bg-primary)', borderRadius: '8px', padding: '16px', marginBottom: '12px',
+                  border: '1px solid var(--border-color)'
                 }}>
-                  <div style={{ fontWeight: 'bold', fontSize: '16px', color: '#6b1d1d', marginBottom: '4px' }}>
+                  <div style={{ fontWeight: 'bold', fontSize: '16px', color: 'var(--primary-color)', marginBottom: '4px' }}>
                     项目 {i + 1}: {p.project}
                   </div>
-                  <div style={{ fontSize: '13px', color: '#78716c', marginBottom: '8px' }}>推荐理由: {p.reason}</div>
+                  <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>推荐理由: {p.reason}</div>
                   {Array.isArray(p.key_points) && p.key_points.length > 0 && (
                     <div>
-                      <div style={{ fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>关键要点:</div>
+                      <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>关键要点:</div>
                       {p.key_points.map((kp, j) => (
                         <div key={j} style={{ fontSize: '13px', paddingLeft: '16px', marginBottom: '2px' }}>
                           · {kp}
@@ -446,7 +446,7 @@ export default function InterviewPrep({ onToast }) {
                   )}
                 </div>
               ))
-            ) : <p style={{ color: '#a8a29e', textAlign: 'center', padding: '20px' }}>(暂无数据)</p>}
+            ) : <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>(暂无数据)</p>}
           </SectionCard>
 
           {/* ===== 技术面试问题 ===== */}
@@ -504,7 +504,7 @@ export default function InterviewPrep({ onToast }) {
                   onToggle={toggleQuestionComplete}
                 >
                   {q.star_framework && (
-                    <div style={{ marginTop: '8px', padding: '8px 12px', background: '#faf5f5', borderRadius: '6px', fontSize: '13px', color: '#6b1d1d' }}>
+                    <div style={{ marginTop: '8px', padding: '8px 12px', background: 'var(--primary-tint)', borderRadius: '6px', fontSize: '13px', color: 'var(--primary-color)' }}>
                       <strong>STAR 提示:</strong> {q.star_framework}
                     </div>
                   )}
@@ -518,28 +518,28 @@ export default function InterviewPrep({ onToast }) {
             <SectionCard icon={Building2} title="公司背景调研">
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: '14px', color: '#6b1d1d', marginBottom: '6px' }}>公司简介</div>
+                  <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--primary-color)', marginBottom: '6px' }}>公司简介</div>
                   <p style={{ fontSize: '14px', lineHeight: '1.7' }}>{data.company_research.overview || '-'}</p>
                 </div>
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: '14px', color: '#6b1d1d', marginBottom: '6px' }}>行业地位</div>
+                  <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--primary-color)', marginBottom: '6px' }}>行业地位</div>
                   <p style={{ fontSize: '14px', lineHeight: '1.7' }}>{data.company_research.industry_position || '-'}</p>
                 </div>
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: '14px', color: '#6b1d1d', marginBottom: '6px' }}>主要技术栈</div>
+                  <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--primary-color)', marginBottom: '6px' }}>主要技术栈</div>
                   <p style={{ fontSize: '14px' }}>{Array.isArray(data.company_research.tech_stack) ? data.company_research.tech_stack.join(', ') : data.company_research.tech_stack || '-'}</p>
                 </div>
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: '14px', color: '#6b1d1d', marginBottom: '6px' }}>文化关键词</div>
+                  <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--primary-color)', marginBottom: '6px' }}>文化关键词</div>
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     {(Array.isArray(data.company_research.culture_keywords) ? data.company_research.culture_keywords : []).map((kw, i) => (
-                      <span key={i} className="tag" style={{ background: '#f5f3ef', color: '#292524' }}>{kw}</span>
+                      <span key={i} className="tag" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>{kw}</span>
                     ))}
                   </div>
                 </div>
                 {data.company_research.recent_news && (
                   <div style={{ gridColumn: '1 / -1' }}>
-                    <div style={{ fontWeight: 600, fontSize: '14px', color: '#6b1d1d', marginBottom: '6px' }}>近期动态</div>
+                    <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--primary-color)', marginBottom: '6px' }}>近期动态</div>
                     <p style={{ fontSize: '14px', lineHeight: '1.7' }}>{data.company_research.recent_news}</p>
                   </div>
                 )}
@@ -553,7 +553,7 @@ export default function InterviewPrep({ onToast }) {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
                 {data.prep_suggestions.before_interview && (
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: '14px', color: '#6b1d1d', marginBottom: '6px' }}>面试前准备</div>
+                    <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--primary-color)', marginBottom: '6px' }}>面试前准备</div>
                     {data.prep_suggestions.before_interview.map((s, i) => (
                       <div key={i} style={{ fontSize: '14px', marginBottom: '4px', paddingLeft: '12px' }}>· {s}</div>
                     ))}
@@ -561,7 +561,7 @@ export default function InterviewPrep({ onToast }) {
                 )}
                 {data.prep_suggestions.resume_tweaks && (
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: '14px', color: '#6b1d1d', marginBottom: '6px' }}>简历微调建议</div>
+                    <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--primary-color)', marginBottom: '6px' }}>简历微调建议</div>
                     {data.prep_suggestions.resume_tweaks.map((s, i) => (
                       <div key={i} style={{ fontSize: '14px', marginBottom: '4px', paddingLeft: '12px' }}>· {s}</div>
                     ))}
@@ -569,17 +569,17 @@ export default function InterviewPrep({ onToast }) {
                 )}
                 {data.prep_suggestions.key_topics_to_review && (
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: '14px', color: '#dc2626', marginBottom: '6px' }}>必复习知识点</div>
+                    <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--danger-color)', marginBottom: '6px' }}>必复习知识点</div>
                     {data.prep_suggestions.key_topics_to_review.map((s, i) => (
-                      <div key={i} style={{ fontSize: '14px', marginBottom: '4px', paddingLeft: '12px', color: '#991b1b' }}>· {s}</div>
+                      <div key={i} style={{ fontSize: '14px', marginBottom: '4px', paddingLeft: '12px', color: 'var(--danger-color)' }}>· {s}</div>
                     ))}
                   </div>
                 )}
                 {data.prep_suggestions.red_flags_to_avoid && (
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: '14px', color: '#dc2626', marginBottom: '6px' }}>需要避免的坑</div>
+                    <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--danger-color)', marginBottom: '6px' }}>需要避免的坑</div>
                     {data.prep_suggestions.red_flags_to_avoid.map((s, i) => (
-                      <div key={i} style={{ fontSize: '14px', marginBottom: '4px', paddingLeft: '12px', color: '#991b1b' }}>· {s}</div>
+                      <div key={i} style={{ fontSize: '14px', marginBottom: '4px', paddingLeft: '12px', color: 'var(--danger-color)' }}>· {s}</div>
                     ))}
                   </div>
                 )}
@@ -592,17 +592,17 @@ export default function InterviewPrep({ onToast }) {
             <SectionCard icon={MessageCircle} title="反问面试官推荐问题" badge={`${data.questions_for_interviewer.length}个`}>
               {data.questions_for_interviewer.map((q, i) => (
                 <div key={i} style={{
-                  borderBottom: i < data.questions_for_interviewer.length - 1 ? '1px solid #f1f5f9' : 'none',
+                  borderBottom: i < data.questions_for_interviewer.length - 1 ? '1px solid var(--border-color)' : 'none',
                   padding: '12px 0', display: 'flex', gap: '12px', alignItems: 'flex-start'
                 }}>
                   <span style={{
-                    width: '26px', height: '26px', borderRadius: '50%', background: '#6b1d1d', color: '#fff',
+                    width: '26px', height: '26px', borderRadius: '50%', background: 'var(--primary-color)', color: '#fff',
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: '12px', fontWeight: 'bold', flexShrink: 0, marginTop: '2px'
                   }}>{i + 1}</span>
                   <div>
                     <div style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '4px' }}>{q.question}</div>
-                    {q.rationale && <div style={{ fontSize: '13px', color: '#78716c' }}>→ {q.rationale}</div>}
+                    {q.rationale && <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>→ {q.rationale}</div>}
                   </div>
                 </div>
               ))}
@@ -612,9 +612,9 @@ export default function InterviewPrep({ onToast }) {
           {/* 进度总结 */}
           {totalQ > 0 && (
             <div className="card" style={{ textAlign: 'center', padding: '20px' }}>
-              <div style={{ fontSize: '15px', color: '#292524' }}>
-                准备进度：<strong style={{ color: completedCount === totalQ ? '#15803d' : '#6b1d1d' }}>{completedCount}/{totalQ}</strong> 道题目已完成
-                {completedCount === totalQ && <span style={{ color: '#16a34a', marginLeft: '8px' }}><CheckCircle size={16} style={{ verticalAlign: 'middle' }} /> 准备就绪！</span>}
+              <div style={{ fontSize: '15px', color: 'var(--text-primary)' }}>
+                准备进度：<strong style={{ color: completedCount === totalQ ? 'var(--success-color)' : 'var(--primary-color)' }}>{completedCount}/{totalQ}</strong> 道题目已完成
+                {completedCount === totalQ && <span style={{ color: 'var(--success-color)', marginLeft: '8px' }}><CheckCircle size={16} style={{ verticalAlign: 'middle' }} /> 准备就绪！</span>}
               </div>
             </div>
           )}
