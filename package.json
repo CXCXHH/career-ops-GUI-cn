@@ -1,0 +1,35 @@
+{
+  "name": "career-ops-gui-cn",
+  "version": "1.0.0",
+  "description": "Career-Ops-GUI-cn: AI-driven Chinese job search GUI for resume building, job tracking, and interview prep",
+  "scripts": {
+    "doctor": "node scripts/maintenance/doctor.mjs",
+    "verify": "node scripts/core/verify-pipeline.mjs",
+    "merge": "node scripts/core/merge-tracker.mjs",
+    "pdf": "node scripts/cv/generate-pdf.mjs",
+    "sync-check": "node scripts/cv/cv-sync-check.mjs",
+    "api": "node gui/server.mjs",
+    "gui:dev": "cd gui && npm run dev",
+    "gui:build": "cd gui && npm run build",
+    "gui:preview": "cd gui && npm run preview"
+  },
+  "keywords": [
+    "ai",
+    "job-search",
+    "gui",
+    "react",
+    "career",
+    "resume",
+    "interview"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@google/generative-ai": "^0.21.0",
+    "dotenv": "^16.4.5",
+    "js-yaml": "^4.1.1",
+    "playwright": "^1.58.1"
+  },
+  "devDependencies": {
+    "axios": "^1.15.2"
+  }
+}
