@@ -3,6 +3,8 @@ cv.md
 data/applications.md
 data/pipeline.md
 data/scan-history.tsv
+data/follow-ups.md
+data/job-radar/
 reports/*.md
 !reports/.gitkeep
 output/*
@@ -30,11 +32,15 @@ modes/_profile.md
 .resolved-prompt-*
 node_modules/
 bun.lock
+gui/dist/
+tmp/
 
-# OS
+# OS & IDE
 .DS_Store
 *.mov
 *.mp4
+.idea/
+.vscode/
 
 # Claude Code local
 .claude/settings.local.json
