@@ -342,7 +342,7 @@ export default function Jobs({ onToast }) {
                 onChange={(e) => setSearchCompany(e.target.value)}
                 style={{ width: '180px', paddingRight: '30px' }}
               />
-              <Search style={{ position: 'absolute', right: '8px', width: '14px', height: '14px', color: '#a8a29e' }} />
+              <Search style={{ position: 'absolute', right: '8px', width: '14px', height: '14px', color: 'var(--text-muted)' }} />
             </div>
           </div>
           <div className="btn-group">
@@ -449,7 +449,7 @@ export default function Jobs({ onToast }) {
         </div>
 
         {validationResult && validationResult.issueCount > 0 && (
-          <div style={{ padding: '12px 24px', background: '#fef3c7', borderBottom: '1px solid #fde68a', fontSize: '13px', color: '#92400e' }}>
+          <div style={{ padding: '12px 24px', background: 'var(--warning-tint)', borderBottom: '1px solid var(--border-color)', fontSize: '13px', color: 'var(--warning-color)' }}>
             <AlertTriangle style={{ width: '14px', height: '14px', marginRight: '6px', verticalAlign: 'middle' }} />
             发现 {validationResult.issueCount} 条数据问题：
             {validationResult.issues.slice(0, 5).map((issue, i) => (
@@ -459,7 +459,7 @@ export default function Jobs({ onToast }) {
               </span>
             ))}
             {validationResult.issues.length > 5 && <span> 等 {validationResult.issues.length} 条</span>}
-            <button onClick={() => setValidationResult(null)} style={{ marginLeft: '12px', background: 'none', border: 'none', cursor: 'pointer', color: '#92400e' }}>关闭</button>
+            <button onClick={() => setValidationResult(null)} style={{ marginLeft: '12px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--warning-color)' }}>关闭</button>
           </div>
         )}
 
@@ -473,9 +473,9 @@ export default function Jobs({ onToast }) {
                   disabled={filteredJobs.length === 0}
                 >
                   {selectedIds.size === filteredJobs.length && filteredJobs.length > 0 ? (
-                    <CheckSquare style={{ width: '18px', height: '18px', color: '#6b1d1d' }} />
+                    <CheckSquare style={{ width: '18px', height: '18px', color: 'var(--primary-color)' }} />
                   ) : (
-                    <Square style={{ width: '18px', height: '18px', color: '#a8a29e' }} />
+                    <Square style={{ width: '18px', height: '18px', color: 'var(--text-muted)' }} />
                   )}
                 </button>
               </th>
@@ -503,19 +503,19 @@ export default function Jobs({ onToast }) {
                     onClick={() => handleSelectOne(job.id)}
                   >
                     {selectedIds.has(job.id) ? (
-                      <CheckSquare style={{ width: '16px', height: '16px', color: '#6b1d1d' }} />
+                      <CheckSquare style={{ width: '16px', height: '16px', color: 'var(--primary-color)' }} />
                     ) : (
-                      <Square style={{ width: '16px', height: '16px', color: '#d6d3d1' }} />
+                      <Square style={{ width: '16px', height: '16px', color: 'var(--border-light)' }} />
                     )}
                   </button>
                 </td>
-                <td>{job.company || <span style={{ color: '#dc2626' }}>缺失</span>}</td>
-                <td>{job.title || <span style={{ color: '#dc2626' }}>缺失</span>}</td>
+                <td>{job.company || <span style={{ color: 'var(--danger-color)' }}>缺失</span>}</td>
+                <td>{job.title || <span style={{ color: 'var(--danger-color)' }}>缺失</span>}</td>
                 <td>{companyTypeLabel(job)}</td>
                 <td>{job.job_level || job.experience || job.parsed?.job_level || '-'}</td>
                 <td>{job.salary || '-'}</td>
                 <td>{job.location || '-'}</td>
-                <td style={{ fontSize: '12px', color: '#78716c' }}>{job.discovered_at ? new Date(job.discovered_at).toLocaleDateString('zh-CN') : '-'}</td>
+                <td style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{job.discovered_at ? new Date(job.discovered_at).toLocaleDateString('zh-CN') : '-'}</td>
                 <td>
                   <span className={`status-badge ${statusClass(job.liveness_status)}`}>
                     {statusLabel(job.liveness_status)}
@@ -525,7 +525,7 @@ export default function Jobs({ onToast }) {
                   {job.score ? (
                     <div>
                       <strong>{job.score}/5</strong>
-                      {job.recommendation && <div style={{ color: '#78716c', fontSize: '12px' }}>{job.recommendation}</div>}
+                      {job.recommendation && <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{job.recommendation}</div>}
                     </div>
                   ) : '-'}
                 </td>
@@ -595,7 +595,7 @@ export default function Jobs({ onToast }) {
                     <div className="form-group">
                       <label>有效性状态</label>
                       <div><span className={`status-badge ${statusClass(selectedJob.liveness_status)}`}>{statusLabel(selectedJob.liveness_status)}</span>
-                        {selectedJob.liveness_reason && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#78716c' }}>{selectedJob.liveness_reason}</span>}
+                        {selectedJob.liveness_reason && <span style={{ marginLeft: '8px', fontSize: '12px', color: 'var(--text-secondary)' }}>{selectedJob.liveness_reason}</span>}
                       </div>
                     </div>
                     <div className="form-group">
@@ -692,12 +692,12 @@ export default function Jobs({ onToast }) {
                     <div className="form-group">
                       <label>AI 优化后的 JD（用于评分和简历生成）</label>
                       <textarea className="form-control" rows="8" value={selectedJob.ai_optimized_jd} readOnly style={{ fontSize: '12px' }} />
-                      <div style={{ marginTop: '6px', fontSize: '12px', color: '#78716c' }}>
+                      <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>
                         置信度：{selectedJob.ai_jd_confidence || '-'} · 模型：{selectedJob.ai_jd_model || '-'}
                         {selectedJob.ai_jd_liveness_status ? ` · 状态判断：${selectedJob.ai_jd_liveness_status}` : ''}
                       </div>
                       {selectedJob.ai_jd_warnings?.length > 0 && (
-                        <ul style={{ margin: '6px 0 0 16px', padding: 0, fontSize: '12px', color: '#92400e' }}>
+                        <ul style={{ margin: '6px 0 0 16px', padding: 0, fontSize: '12px', color: 'var(--warning-color)' }}>
                           {selectedJob.ai_jd_warnings.map((item, index) => <li key={`ai-warning-${index}`}>{item}</li>)}
                         </ul>
                       )}
@@ -731,7 +731,7 @@ export default function Jobs({ onToast }) {
                     </button>
                   </div>
                   {!selectedJob.raw_text && !selectedJob.description && !selectedJob.parsed && (
-                    <div style={{ padding: '12px', background: '#fef3c7', borderRadius: '6px', fontSize: '13px', color: '#94000e', marginBottom: '12px' }}>
+                    <div style={{ padding: '12px', background: 'var(--warning-tint)', borderRadius: '6px', fontSize: '13px', color: 'var(--danger-color)', marginBottom: '12px' }}>
                       <AlertTriangle style={{ width: '14px', height: '14px', marginRight: '6px', verticalAlign: 'middle' }} />
                       该岗位尚未提取详细内容，请点击「提取」按钮获取
                     </div>
@@ -782,7 +782,7 @@ export default function Jobs({ onToast }) {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <AlertTriangle style={{ width: '24px', height: '24px', color: '#f59e0b' }} />
+                <AlertTriangle style={{ width: '24px', height: '24px', color: 'var(--warning-color)' }} />
                 <h3>确认批量删除</h3>
               </div>
               <button className="btn btn-close" onClick={() => setShowConfirmModal(false)}>×</button>
@@ -791,7 +791,7 @@ export default function Jobs({ onToast }) {
               <p style={{ marginBottom: '12px' }}>
                 您即将删除 <strong>{selectedIds.size}</strong> 个岗位。此操作无法撤销。
               </p>
-              <p style={{ color: '#dc2626', fontSize: '13px' }}>
+              <p style={{ color: 'var(--danger-color)', fontSize: '13px' }}>
                 删除后，这些岗位将从岗位列表中永久移除。
               </p>
             </div>

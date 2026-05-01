@@ -355,7 +355,7 @@ function ModuleItem({ module, index, onToggle, onEdit, onDelete, onEditData, onD
       className={`module-item ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
     >
       <GripVertical className="drag-handle" />
-      <span className="module-name" style={{ color: module.enabled ? undefined : '#a8a29e' }}>
+      <span className="module-name" style={{ color: module.enabled ? undefined : 'var(--text-muted)' }}>
         {module.name}
         {module.type === 'custom' && <span className="custom-badge">自定义</span>}
       </span>
@@ -673,7 +673,7 @@ function PreviewModal({ profile, education, experience, projects, modules, photo
             <div className="empty-state" style={{ minHeight: '320px' }}>
               <FileText size={32} />
               <p>暂无可预览内容</p>
-              <p style={{ fontSize: '13px', color: '#78716c' }}>先填写基本信息、教育背景、项目经历或自定义模块内容，再预览简历。</p>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>先填写基本信息、教育背景、项目经历或自定义模块内容，再预览简历。</p>
             </div>
           ) : (
             <>
@@ -1288,7 +1288,7 @@ export default function ResumeBuilder({ onToast }) {
                     删除照片
                   </button>
                 )}
-                <div style={{ marginTop: '8px', fontSize: '12px', color: '#78716c', textAlign: 'center' }}>
+                <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--text-secondary)', textAlign: 'center' }}>
                   支持 PNG/JPG，保存基本信息后会用于预览和简历导出
                 </div>
               </div>
@@ -1590,7 +1590,7 @@ export default function ResumeBuilder({ onToast }) {
             {resumeFiles.map((file, index) => (
               <li key={`${file.path}-${index}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                 <a href={`/${file.path}`} target="_blank" rel="noreferrer" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.fileName || file.name || file.path}</a>
-                <button onClick={() => handleDeleteFile(file, index)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px', borderRadius: '4px', display: 'flex', alignItems: 'center' }} title="删除文件">
+                <button onClick={() => handleDeleteFile(file, index)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger-color)', padding: '4px', borderRadius: '4px', display: 'flex', alignItems: 'center' }} title="删除文件">
                   <Trash2 size={16} />
                 </button>
               </li>

@@ -101,7 +101,7 @@ export default function Candidates({ onToast }) {
     <>
       <div className="page-header">
         <h2>候选区</h2>
-        <p style={{ fontSize: '13px', color: '#78716c', marginTop: '4px' }}>
+        <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
           低置信或待验证的岗位，确认后可移入正式岗位列表
         </p>
       </div>
@@ -123,7 +123,7 @@ export default function Candidates({ onToast }) {
         <div className="card">
           <div className="empty-state">
             <p>候选区为空</p>
-            <p style={{ fontSize: '13px', color: '#a8a29e' }}>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
               导入 JSON 时，validation_status 为 blocked/unverified_low_priority 的岗位会进入候选区；expired/dead 会被拒绝
             </p>
           </div>
@@ -173,7 +173,7 @@ export default function Candidates({ onToast }) {
                       {c.validation_status || '未标注'}
                     </span>
                   </td>
-                  <td style={{ fontSize: '12px', color: '#78716c', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <td style={{ fontSize: '12px', color: 'var(--text-secondary)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {c.candidate_reason || c.liveness_reason || ''}
                   </td>
                   <td>

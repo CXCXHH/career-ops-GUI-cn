@@ -160,10 +160,10 @@ export default function Settings({ onToast }) {
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'pass': return <CheckCircle style={{ color: '#16a34a', width: '20px', height: '20px' }} />
-      case 'warn': return <AlertCircle style={{ color: '#f59e0b', width: '20px', height: '20px' }} />
-      case 'fail': return <AlertCircle style={{ color: '#dc2626', width: '20px', height: '20px' }} />
-      default: return <Activity style={{ color: '#78716c', width: '20px', height: '20px' }} />
+      case 'pass': return <CheckCircle style={{ color: 'var(--success-color)', width: '20px', height: '20px' }} />
+      case 'warn': return <AlertCircle style={{ color: 'var(--warning-color)', width: '20px', height: '20px' }} />
+      case 'fail': return <AlertCircle style={{ color: 'var(--danger-color)', width: '20px', height: '20px' }} />
+      default: return <Activity style={{ color: 'var(--text-secondary)', width: '20px', height: '20px' }} />
     }
   }
 
@@ -208,7 +208,7 @@ export default function Settings({ onToast }) {
         <div className="card-header">
           <div>
             <div className="card-title">AI API 评分配置</div>
-            <p style={{ color: '#78716c', fontSize: '13px', marginTop: '4px' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '4px' }}>
               API Key 会保存到本机项目 .env 文件。留空 Key 时只更新模型和地址，不会清空已有 Key；如需删除，请使用清除按钮。
             </p>
           </div>

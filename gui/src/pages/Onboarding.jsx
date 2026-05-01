@@ -414,7 +414,7 @@ export default function Onboarding({ onToast }) {
         {!collapsed.projects && (
           <>
         {form.candidate.projects.length === 0 && (
-          <p style={{ color: '#888', fontSize: '13px', marginBottom: '12px' }}>暂无项目经历，点击下方按钮添加</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '12px' }}>暂无项目经历，点击下方按钮添加</p>
         )}
         {form.candidate.projects.map((proj, idx) => (
           <ProjectItem
@@ -446,7 +446,7 @@ export default function Onboarding({ onToast }) {
         {!collapsed.experience && (
           <>
         {form.candidate.experience.length === 0 && (
-          <p style={{ color: '#888', fontSize: '13px', marginBottom: '12px' }}>暂无工作/实习经历，点击下方按钮添加</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '12px' }}>暂无工作/实习经历，点击下方按钮添加</p>
         )}
         {form.candidate.experience.map((exp, idx) => (
           <ExperienceItem
@@ -515,7 +515,7 @@ export default function Onboarding({ onToast }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
           <SaveButton section="all" label="全部保存" />
           {savedFiles.length > 0 && (
-            <div style={{ fontSize: '13px', color: '#16a34a' }}>
+            <div style={{ fontSize: '13px', color: 'var(--success-color)' }}>
               已生成：{savedFiles.join('、')}
             </div>
           )}
