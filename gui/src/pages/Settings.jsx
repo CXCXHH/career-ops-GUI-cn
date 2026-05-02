@@ -1,14 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Gear, Pulse, CheckCircle, WarningCircle, Clock, Terminal } from '@phosphor-icons/react'
-import { aiAPI, healthAPI } from '../api'
+import { Gear } from '@phosphor-icons/react'
+import { aiAPI } from '../api'
 import { showToast } from '../utils/toast'
 import { PageTransition, LiquidSectionHeader, LiquidCard, MagneticButton } from '../components/LiquidMotion'
 import '../styles/liquid-motion.css'
 
 export default function Settings({ onToast }) {
-  const [healthStatus, setHealthStatus] = useState(null)
-  const [isRunning, setIsRunning] = useState(false)
-  const [commandOutput, setCommandOutput] = useState('')
   const [aiSettings, setAiSettings] = useState(null)
   const [aiForm, setAiForm] = useState({
     deepseek: { apiKey: '', baseUrl: 'https://api.deepseek.com', model: 'deepseek-v4-pro' },
@@ -18,19 +15,8 @@ export default function Settings({ onToast }) {
   const [clearingProvider, setClearingProvider] = useState('')
 
   useEffect(() => {
-    fetchHealth()
     fetchAiSettings()
   }, [])
-
-  const fetchHealth = async () => {
-    try {
-      const res = await healthAPI.check()
-      setHealthStatus(res.data)
-    } catch (error) {
-      console.error('Settings fetch health error:', error)
-      showToast(onToast, '加载健康状态失败', 'error')
-    }
-  }
 
   const fetchAiSettings = async () => {
     try {
@@ -114,96 +100,11 @@ export default function Settings({ onToast }) {
     }
   }
 
-  const runDoctor = async () => {
-    setIsRunning(true)
-    setCommandOutput('')
-    try {
-      const res = await healthAPI.doctor()
-      setHealthStatus(res.data.checks)
-      setCommandOutput(res.data.output || 'Doctor check completed\n')
-      showToast(onToast, '健康检查完成，缺失依赖已尝试自动安装', 'success')
-    } catch (error) {
-      setCommandOutput(`Error: ${error.message}\n`)
-      showToast(onToast, '健康检查失败', 'error')
-    } finally {
-      setIsRunning(false)
-    }
-  }
-
-  const runVerify = async () => {
-    setIsRunning(true)
-    setCommandOutput('')
-    try {
-      const res = await healthAPI.verify()
-      setCommandOutput(res.data.output || 'Verification completed\n')
-      showToast(onToast, '验证完成', 'success')
-    } catch (error) {
-      setCommandOutput(`Error: ${error.message}\n`)
-      showToast(onToast, '验证失败', 'error')
-    } finally {
-      setIsRunning(false)
-    }
-  }
-
-  const runSync = async () => {
-    setIsRunning(true)
-    setCommandOutput('')
-    try {
-      const res = await healthAPI.syncCheck()
-      setCommandOutput(res.data.output || 'Sync check completed\n')
-      showToast(onToast, '同步检查完成', 'success')
-    } catch (error) {
-      setCommandOutput(`Error: ${error.message}\n`)
-      showToast(onToast, '同步检查失败', 'error')
-    } finally {
-      setIsRunning(false)
-    }
-  }
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'pass': return <CheckCircle style={{ color: 'var(--success-color)', width: '20px', height: '20px' }} />
-      case 'warn': return <WarningCircle style={{ color: 'var(--warning-color)', width: '20px', height: '20px' }} />
-      case 'fail': return <WarningCircle style={{ color: 'var(--danger-color)', width: '20px', height: '20px' }} />
-      default: return <Pulse style={{ color: 'var(--text-secondary)', width: '20px', height: '20px' }} />
-    }
-  }
-
   return (
     <PageTransition>
-      <LiquidSectionHeader title="设置" subtitle="系统健康检查和配置" icon={Gear} />
+      <LiquidSectionHeader title="设置" subtitle="AI API 配置管理" icon={Gear} />
 
       <LiquidCard delay={0}>
-        <div className="card-header">
-          <div className="card-title">系统健康状态</div>
-          <MagneticButton variant="primary" className="btn-sm" onClick={runDoctor} disabled={isRunning}>
-            <Pulse style={{ width: '14px', height: '14px', marginRight: '6px' }} />
-            运行检查并安装依赖
-          </MagneticButton>
-        </div>
-        {healthStatus && (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>检查项</th>
-                <th>状态</th>
-                <th>详情</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(healthStatus).map(([key, value]) => (
-                <tr key={key} className="liquid-table-row">
-                  <td>{key}</td>
-                  <td>{getStatusIcon(value.status)}</td>
-                  <td>{value.message}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </LiquidCard>
-
-      <LiquidCard delay={0.08}>
         <div className="card-header">
           <div>
             <div className="card-title">AI API 评分配置</div>
@@ -311,31 +212,6 @@ export default function Settings({ onToast }) {
           </div>
         </div>
       </LiquidCard>
-
-      <LiquidCard delay={0.16}>
-        <div className="card-header">
-          <div className="card-title">工具命令</div>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', padding: '0 24px 24px' }}>
-          <MagneticButton variant="secondary" className="btn-sm" onClick={runVerify} disabled={isRunning}>
-            <Terminal style={{ width: '14px', height: '14px', marginRight: '8px' }} />
-            验证配置
-          </MagneticButton>
-          <MagneticButton variant="secondary" className="btn-sm" onClick={runSync} disabled={isRunning}>
-            <Clock style={{ width: '14px', height: '14px', marginRight: '8px' }} />
-            同步检查
-          </MagneticButton>
-        </div>
-      </LiquidCard>
-
-      {commandOutput && (
-        <LiquidCard delay={0.24}>
-          <div className="card-header">
-            <div className="card-title">命令输出</div>
-          </div>
-          <pre className="command-output">{commandOutput}</pre>
-        </LiquidCard>
-      )}
     </PageTransition>
   )
 }

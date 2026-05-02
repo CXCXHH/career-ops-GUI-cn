@@ -90,6 +90,7 @@ export const discoveryAPI = {
   run: (companyId, keywords) => unwrap(axios.post(`${API_BASE}/discovery/run`, { companyId, keywords })),
   scan: (companyId, keywords) => unwrap(axios.post(`${API_BASE}/discovery/run`, { companyId, keywords })),
   search: (params) => unwrap(axios.post(`${API_BASE}/discovery/search`, params)),
+  aiSearch: (params) => unwrap(axios.post(`${API_BASE}/discovery/ai-search`, params)),
   importJson: (jsonData) => unwrap(axios.post(`${API_BASE}/discovery/import-json`, { jsonData })),
   getRuns: () => unwrap(axios.get(`${API_BASE}/discovery/runs`))
 }
