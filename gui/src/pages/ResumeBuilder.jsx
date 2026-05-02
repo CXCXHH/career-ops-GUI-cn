@@ -716,10 +716,17 @@ function PreviewModal({ profile, education, experience, projects, modules, photo
 
   const renderModule = (mod) => {
     if (mod.type === 'custom' && mod.content) {
+      const lines = renderBulletLines(mod.content)
       return (
         <section key={mod.id} style={{ marginBottom: '16px' }}>
           {renderSectionTitle(mod.name)}
-          <p style={{ fontSize: '13px', lineHeight: '1.7', color: 'var(--text-primary)', whiteSpace: 'pre-line' }}>{mod.content}</p>
+          {lines.length > 1 ? (
+            <ul style={{ margin: '6px 0 0 16px', padding: 0, fontSize: '13px', color: 'var(--text-primary)', lineHeight: '1.7' }}>
+              {lines.map((line, idx) => <li key={idx}>{line}</li>)}
+            </ul>
+          ) : (
+            <p style={{ fontSize: '13px', lineHeight: '1.7', color: 'var(--text-primary)' }}>{mod.content}</p>
+          )}
         </section>
       )
     }
