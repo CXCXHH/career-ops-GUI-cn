@@ -1,0 +1,20 @@
+title_filter:
+  positive:
+    - 目标岗位
+  negative:
+    - 销售
+    - 客服
+    - 培训
+    - 保险
+    - 中介
+  seniority_boost:
+    - 校招/应届
+    - 初级
+search_queries:
+  - name: BOSS直聘 -- 全国 -- 目标岗位
+    query: site:zhipin.com/web/geek/job "全国" "目标岗位"
+    enabled: true
+  - name: 猎聘 -- 全国 -- 目标岗位
+    query: site:liepin.com "全国" "目标岗位"
+    enabled: true
+tracked_companies: []
