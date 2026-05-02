@@ -636,6 +636,92 @@ function AiAutoFillModal({ isOpen, onClose, section, onFill, onToast }) {
   )
 }
 
+function BulkImportModal({ isOpen, onClose, providers, selectedProvider, onProviderChange, onImport, onToast }) {
+  const [inputText, setInputText] = useState('')
+  const [isImporting, setIsImporting] = useState(false)
+
+  const handleImport = async () => {
+    if (!inputText.trim()) {
+      showToast(onToast, '请粘贴要导入的资料内容', 'error')
+      return
+    }
+    setIsImporting(true)
+    try {
+      await onImport({ provider: selectedProvider, userInput: inputText.trim() })
+      showToast(onToast, '资料导入成功', 'success')
+      onClose()
+      setInputText('')
+    } catch (error) {
+      showToast(onToast, error?.response?.data?.error || error?.message || '导入失败', 'error')
+    } finally {
+      setIsImporting(false)
+    }
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999,
+      background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center'
+    }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: 'var(--bg-primary)', borderRadius: '20px', padding: '32px',
+        maxWidth: '640px', width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+          <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Sparkle size={20} style={{ color: 'var(--primary-color)' }} />
+            AI 批量导入资料
+          </h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', borderRadius: '8px' }}>
+            <X size={20} style={{ color: 'var(--text-muted)' }} />
+          </button>
+        </div>
+
+        <div style={{
+          background: 'var(--haze-blue-50)', borderRadius: '12px', padding: '12px 16px',
+          marginBottom: '16px', fontSize: '13px', color: 'var(--haze-blue-800)', display: 'flex', gap: '8px', alignItems: 'flex-start'
+        }}>
+          <Warning size={16} style={{ flexShrink: 0, marginTop: '1px' }} />
+          <div>粘贴旧简历、项目描述或任意非结构化文本，AI 会自动提取结构化数据并与已有内容合并。不会覆盖已有数据，只补充新增内容。</div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px', marginBottom: '16px' }}>
+          <div className="form-item" style={{ marginBottom: 0 }}>
+            <label style={{ fontSize: '13px', fontWeight: 500 }}>AI 模型</label>
+            <select value={selectedProvider} onChange={(e) => onProviderChange(e.target.value)} className="form-control">
+              {providers.map(p => (
+                <option key={p.id} value={p.id} disabled={!p.configured}>
+                  {p.label} {p.configured ? `(${p.model})` : '(未配置 Key)'}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <textarea
+          className="form-control"
+          rows={12}
+          value={inputText}
+          onChange={(e) => setInputText(e.target.value)}
+          placeholder={`粘贴你的资料内容，例如：\n\n# 姓名\n某大学 某专业 本科 2023-2027\n\n项目经历：\n1. XXX项目 - 使用Python做数据分析...\n2. XXX项目 - ...\n\n实习经历：\n在XX公司担任XX岗位...\n\n技能：Python, R, SQL...`}
+          style={{ resize: 'vertical', fontSize: '14px', lineHeight: '1.7' }}
+        />
+
+        <div style={{ display: 'flex', gap: '12px', marginTop: '16px', justifyContent: 'flex-end' }}>
+          <button className="btn btn-secondary" onClick={onClose} disabled={isImporting}>取消</button>
+          <button className="btn btn-primary" onClick={handleImport} disabled={isImporting || !inputText.trim()}>
+            <Sparkle size={16} style={{ marginRight: '6px' }} />
+            {isImporting ? 'AI 提取中...' : '开始导入'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function PreviewModal({ profile, education, experience, projects, modules, photoPreview, onClose }) {
   const asText = (value) => {
     if (Array.isArray(value)) return value.map(item => String(item || '').trim()).filter(Boolean).join('、')
@@ -720,13 +806,9 @@ function PreviewModal({ profile, education, experience, projects, modules, photo
       return (
         <section key={mod.id} style={{ marginBottom: '16px' }}>
           {renderSectionTitle(mod.name)}
-          {lines.length > 1 ? (
-            <ul style={{ margin: '6px 0 0 16px', padding: 0, fontSize: '13px', color: 'var(--text-primary)', lineHeight: '1.7' }}>
-              {lines.map((line, idx) => <li key={idx}>{line}</li>)}
-            </ul>
-          ) : (
-            <p style={{ fontSize: '13px', lineHeight: '1.7', color: 'var(--text-primary)' }}>{mod.content}</p>
-          )}
+          {lines.map((line, idx) => (
+            <div key={idx} style={{ marginBottom: '4px', fontSize: '13px', color: 'var(--text-primary)' }}>{line}</div>
+          ))}
         </section>
       )
     }
@@ -927,6 +1009,7 @@ export default function ResumeBuilder({ onToast }) {
   })
   const [validationErrors, setValidationErrors] = useState({})
   const [aiModal, setAiModal] = useState({ open: false, section: '' })
+  const [bulkImportOpen, setBulkImportOpen] = useState(false)
   const basicPhotoSrc = resolvePhotoSrc(profile, photoPreview)
 
   useEffect(() => {
@@ -1101,8 +1184,18 @@ export default function ResumeBuilder({ onToast }) {
       case 'education': return handleAiFillEducation
       case 'experience': return handleAiFillExperience
       case 'projects': return handleAiFillProjects
-      default: return () => {}
+      default: return () => { }
     }
+  }
+
+  const handleBulkImport = async (params) => {
+    const res = await resumeAPI.bulkImport(params)
+    const data = res.data || {}
+    setProfile(data)
+    if (Array.isArray(data.education)) setEducation(data.education)
+    if (Array.isArray(data.experience)) setExperience(data.experience)
+    if (Array.isArray(data.projects)) setProjects(data.projects)
+    fetchModules()
   }
 
   const validateBasicInfo = () => {
@@ -1644,6 +1737,13 @@ export default function ResumeBuilder({ onToast }) {
                   <div style={{ fontSize: '11px', opacity: 0.8 }}>生成可打印的 PDF 文件</div>
                 </div>
               </MagneticButton>
+              <MagneticButton variant="secondary" onClick={() => setBulkImportOpen(true)} style={{ flex: 1 }}>
+                <Upload size={18} style={{ marginRight: '6px' }} />
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: 600 }}>AI 批量导入</div>
+                  <div style={{ fontSize: '11px', opacity: 0.8 }}>粘贴资料，AI 自动提取填充</div>
+                </div>
+              </MagneticButton>
             </div>
 
             {isGenerating && (
@@ -1735,6 +1835,17 @@ export default function ResumeBuilder({ onToast }) {
         onClose={closeAiModal}
         section={aiModal.section}
         onFill={handleAiFill(aiModal.section)}
+        onToast={onToast}
+      />
+
+      {/* ── AI 批量导入模态框 ── */}
+      <BulkImportModal
+        isOpen={bulkImportOpen}
+        onClose={() => setBulkImportOpen(false)}
+        providers={providers}
+        selectedProvider={selectedProvider}
+        onProviderChange={setSelectedProvider}
+        onImport={handleBulkImport}
         onToast={onToast}
       />
     </PageTransition>

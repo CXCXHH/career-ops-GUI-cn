@@ -83,7 +83,8 @@ export const resumeAPI = {
   getVersion: (id) => unwrap(axios.get(`${API_BASE}/resume/files/${id}`)),
   deleteVersion: (id) => unwrap(axios.delete(`${API_BASE}/resume/files/${id}`)),
   deleteAllVersions: () => unwrap(axios.delete(`${API_BASE}/resume/files`)),
-  autoFill: (data) => unwrap(axios.post(`${API_BASE}/resume/auto-fill`, data))
+  autoFill: (data) => unwrap(axios.post(`${API_BASE}/resume/auto-fill`, data)),
+  bulkImport: (data) => unwrap(axios.post(`${API_BASE}/resume/bulk-import`, data))
 }
 
 export const discoveryAPI = {

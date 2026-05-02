@@ -6249,6 +6249,140 @@ const routes = {
       return { success: true, data: profile }
     }
   },
+  '/api/resume/bulk-import': {
+    POST: async (body) => {
+      const { provider, userInput } = body || {}
+      if (!userInput || !userInput.trim()) {
+        return { success: false, error: '请输入要导入的资料内容' }
+      }
+      const profile = getResumeProfile()
+      const existingAwards = (profile.modules || []).find(m => m.id === 'awards')?.content || ''
+
+      const prompt = `你是一个简历数据提取与合并专家。请根据【用户新输入的资料】，提取结构化简历数据。
+
+## 合并规则（极其重要）
+1. 已有数据是"底稿"，用户新输入是"补充源"
+2. 基本信息（姓名、性别、年龄等）：只填充当前为空的字段，不覆盖已有值
+3. 教育/经历/项目数组：逐条比对——如果新条目与已有条目描述的是同一段经历（同学校/同公司/同项目名），则合并补充缺失字段；如果是全新条目，则追加
+4. 技能：取已有技能和新技能的并集，去重
+5. 获奖荣誉：追加新获奖，不删除已有获奖
+6. summary（一句话定位）：如果已有则保留，不覆盖
+7. description 字段中的多条内容必须用中文分号"；"分隔，不要用句号
+
+## 已有数据
+${JSON.stringify({
+  full_name: profile.full_name || '',
+  gender: profile.gender || '',
+  age: profile.age || '',
+  phone: profile.phone || '',
+  email: profile.email || '',
+  wechat: profile.wechat || '',
+  github: profile.github || '',
+  summary: profile.summary || '',
+  skills: profile.skills || '',
+  education: profile.education || [],
+  experience: profile.experience || [],
+  projects: profile.projects || []
+}, null, 2)}
+
+已有获奖荣誉：${existingAwards || '无'}
+
+## 用户新输入的资料
+${userInput.trim()}
+
+## 要求
+返回一个 JSON 对象，包含以下字段（即使某字段无变化也要返回原值）：
+{
+  "full_name": "",
+  "gender": "",
+  "age": "",
+  "phone": "",
+  "email": "",
+  "wechat": "",
+  "github": "",
+  "summary": "",
+  "skills": "技能1, 技能2, 技能3",
+  "education": [{"school":"","degree":"","major":"","start_date":"YYYY-MM","end_date":"YYYY-MM","gpa":"","description":""}],
+  "experience": [{"company":"","position":"","start_date":"YYYY-MM","end_date":"YYYY-MM","description":"用分号分隔的短句","role":""}],
+  "projects": [{"name":"","role":"","start_date":"YYYY-MM","end_date":"YYYY-MM","description":"用分号分隔的短句","tech_stack":""}],
+  "awards": "获奖1；获奖2；获奖3"
+}
+
+只返回 JSON，不要任何其他文字。`
+
+      try {
+        const response = await callChatCompletions(provider, prompt, {
+          systemPrompt: '你是严格输出 JSON 的简历数据合并专家。只返回JSON对象，不要任何其他文字。不要用markdown代码块包裹。',
+          temperature: 0.1,
+          maxTokens: 6000
+        })
+        const parsed = extractJsonObject(response.content)
+
+        // 智能合并：基本信息只填空
+        const merged = { ...profile }
+        for (const key of ['full_name', 'gender', 'age', 'phone', 'email', 'wechat', 'github']) {
+          if (!merged[key] && parsed[key]) merged[key] = parsed[key]
+        }
+        if (!merged.summary && parsed.summary) merged.summary = parsed.summary
+        if (!merged.skills && parsed.skills) merged.skills = parsed.skills
+        // 技能合并：如果都有值，取并集
+        if (merged.skills && parsed.skills) {
+          const oldSet = new Set(merged.skills.split(/[,，、]/).map(s => s.trim()).filter(Boolean))
+          for (const s of parsed.skills.split(/[,，、]/).map(s => s.trim()).filter(Boolean)) {
+            oldSet.add(s)
+          }
+          merged.skills = Array.from(oldSet).join(', ')
+        }
+
+        // 数组合并：按名称去重追加
+        const mergeArray = (existing, incoming, nameKey) => {
+          if (!Array.isArray(incoming) || incoming.length === 0) return existing || []
+          const result = [...(existing || [])]
+          for (const newItem of incoming) {
+            const newName = (newItem[nameKey] || '').trim()
+            if (!newName) continue
+            const idx = result.findIndex(e => (e[nameKey] || '').trim() === newName)
+            if (idx >= 0) {
+              // 同名条目：合并补充空字段
+              for (const k of Object.keys(newItem)) {
+                if (!result[idx][k] && newItem[k]) result[idx][k] = newItem[k]
+              }
+            } else {
+              result.push(newItem)
+            }
+          }
+          return result
+        }
+
+        merged.education = mergeArray(profile.education, parsed.education, 'school')
+        merged.experience = mergeArray(profile.experience, parsed.experience, 'company')
+        merged.projects = mergeArray(profile.projects, parsed.projects, 'name')
+
+        // 获奖合并
+        const newAwards = parsed.awards || ''
+        if (newAwards) {
+          const existingList = existingAwards.split('；').map(s => s.trim()).filter(Boolean)
+          const newList = newAwards.split('；').map(s => s.trim()).filter(Boolean)
+          const awardSet = new Set(existingList)
+          for (const a of newList) awardSet.add(a)
+          const mergedAwards = Array.from(awardSet).join('；')
+          const modules = normalizeResumeModules(profile.modules)
+          const awardsIdx = modules.findIndex(m => m.id === 'awards')
+          if (awardsIdx >= 0) {
+            modules[awardsIdx].content = mergedAwards
+          } else {
+            modules.push({ id: 'awards', name: '获奖荣誉', type: 'custom', enabled: true, content: mergedAwards })
+          }
+          merged.modules = modules
+        }
+
+        const saved = saveResumeProfile(merged)
+        return { success: true, data: saved }
+      } catch (error) {
+        return { success: false, error: `AI 导入失败：${error.message}` }
+      }
+    }
+  },
   '/api/resume/auto-fill': {
     POST: async (body) => {
       const { provider, section, userInput } = body || {}
