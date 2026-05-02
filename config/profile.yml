@@ -1,0 +1,25 @@
+candidate:
+  full_name: '[你的姓名]'
+  email: '[你的邮箱]'
+  phone: '[你的电话]'
+  gender: ''
+  age: ''
+  wechat: ''
+  portfolio_url: ''
+  github: ''
+target_roles:
+  primary: []
+  archetypes: []
+narrative:
+  headline: '[你的职业头衔]'
+  exit_story: ''
+  superpowers: []
+compensation:
+  target_range: '[期望薪资]'
+  currency: CNY
+  minimum: '[最低接受薪资]'
+location:
+  country: China
+  city: 全国
+  timezone: CST
+  visa_status: 不需要签证
