@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { FileText, ArrowsClockwise, Trash, Eye, ArrowSquareOut, CheckCircle, Warning, MagnifyingGlass, CheckSquare, Square, Spinner, Plus } from '@phosphor-icons/react'
-import { aiAPI, jobsAPI } from '../api'
+import { FileText, ArrowsClockwise, Trash, Eye, ArrowSquareOut, CheckCircle, Warning, MagnifyingGlass, CheckSquare, Square, Spinner, Plus, Upload } from '@phosphor-icons/react'
+import { aiAPI, jobsAPI, discoveryAPI } from '../api'
 import { showToast } from '../utils/toast'
 import { PageTransition, LiquidSectionHeader, LiquidCard, MagneticButton } from '../components/LiquidMotion'
 import '../styles/liquid-motion.css'
@@ -28,6 +28,20 @@ export default function Jobs({ onToast }) {
   const [isSavingUrl, setIsSavingUrl] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 10
+
+  // Import area state (from Discovery)
+  const [manualUrl, setManualUrl] = useState('')
+  const [isImportingUrl, setIsImportingUrl] = useState(false)
+  const [isFileImporting, setIsFileImporting] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const [importProgress, setImportProgress] = useState(0)
+  const [isAiSearching, setIsAiSearching] = useState(false)
+  const [aiDirection, setAiDirection] = useState('')
+  const [aiCity, setAiCity] = useState('')
+  const [aiEnterpriseType, setAiEnterpriseType] = useState('不限')
+  const [aiJobLevel, setAiJobLevel] = useState('不限')
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importTab, setImportTab] = useState('url')
 
   useEffect(() => {
     fetchJobs()
@@ -279,6 +293,106 @@ export default function Jobs({ onToast }) {
     }
   }
 
+  // ── Import handlers (from Discovery) ──
+
+  const ENTERPRISE_TYPES = ['不限', '国企央企', '民营名企', '外企']
+  const JOB_LEVELS = ['不限', '实习', '校招/应届', '初级（1-3年）', '中级（3-5年）', '高级/资深']
+
+
+
+  const handleImportUrl = async () => {
+    const url = manualUrl.trim()
+    if (!url) { showToast(onToast, '请先粘贴岗位 URL', 'error'); return }
+    setIsImportingUrl(true)
+    try {
+      await jobsAPI.importUrl(url)
+      setManualUrl('')
+      await fetchJobs()
+      showToast(onToast, '岗位 URL 已导入', 'success')
+    } catch (error) {
+      showToast(onToast, `导入失败：${error.message}`, 'error')
+    } finally { setIsImportingUrl(false) }
+  }
+
+  const handleAiSearch = async () => {
+    if (!aiDirection.trim()) { showToast(onToast, '请输入专业方向', 'error'); return }
+    setIsAiSearching(true)
+    try {
+      const response = await discoveryAPI.aiSearch({
+        direction: aiDirection.trim(), city: aiCity.trim(),
+        enterpriseType: aiEnterpriseType, jobLevel: aiJobLevel
+      })
+      const result = response.data
+      await fetchJobs()
+      const imported = result.imported || {}
+      const parts = []
+      if (imported.added > 0) parts.push(`新增 ${imported.added} 个`)
+      if (imported.duplicates > 0) parts.push(`重复 ${imported.duplicates} 个`)
+      if (result.companies_added > 0) parts.push(`新公司 ${result.companies_added} 家`)
+      const msg = parts.length > 0 ? `AI 搜索完成：${parts.join('，')}` : 'AI 搜索完成，未发现新岗位'
+      showToast(onToast, msg, imported.added > 0 ? 'success' : 'warning')
+    } catch (error) {
+      showToast(onToast, `AI 搜索失败：${error.message}`, 'error')
+    } finally { setIsAiSearching(false) }
+  }
+
+  const handleFileImport = async (event) => {
+    try {
+      const file = event.target.files?.[0]
+      if (!file) return
+      if (!file.name.toLowerCase().endsWith('.json')) { showToast(onToast, '请选择 JSON 文件', 'error'); return }
+      const content = await file.text()
+      let data
+      try { data = JSON.parse(content) } catch (e) { showToast(onToast, 'JSON 格式无效', 'error'); return }
+
+      if (data.jobs || data.by_enterprise_type || data.by_company) {
+        setIsFileImporting(true)
+        setImportProgress(0)
+        const response = await discoveryAPI.importJson(data)
+        const result = response.data
+        setImportProgress(100)
+        await fetchJobs()
+        const parts = []
+        if (result.addedJobs > 0) parts.push(`岗位 ${result.addedJobs} 个`)
+        if (result.addedCandidates > 0) parts.push(`候选 ${result.addedCandidates} 个`)
+        if (result.addedCompanies > 0) parts.push(`公司 ${result.addedCompanies} 家`)
+        if (result.duplicateJobs > 0) parts.push(`重复 ${result.duplicateJobs} 个`)
+        const msg = parts.length > 0 ? `导入完成：${parts.join('，')}` : '导入完成'
+        showToast(onToast, msg, result.addedJobs > 0 ? 'success' : 'warning')
+        setIsFileImporting(false)
+        setTimeout(() => setImportProgress(0), 500)
+      }
+    } catch (error) {
+      showToast(onToast, `文件导入失败：${error.message}`, 'error')
+      setIsFileImporting(false)
+    } finally {
+      if (event.target) event.target.value = ''
+    }
+  }
+
+  const handleDragOver = (e) => { e.preventDefault(); setIsDragging(true) }
+  const handleDragLeave = (e) => { e.preventDefault(); setIsDragging(false) }
+  const handleDrop = async (e) => {
+    e.preventDefault(); e.stopPropagation(); setIsDragging(false)
+    try {
+      const file = e.dataTransfer?.files?.[0]
+      if (!file || !file.name.toLowerCase().endsWith('.json')) { showToast(onToast, '请拖拽 JSON 文件', 'error'); return }
+      const content = await file.text()
+      let data
+      try { data = JSON.parse(content) } catch (e) { showToast(onToast, 'JSON 格式无效', 'error'); return }
+      if (data.jobs || data.by_enterprise_type || data.by_company) {
+        setIsFileImporting(true); setImportProgress(0)
+        const response = await discoveryAPI.importJson(data)
+        const result = response.data
+        setImportProgress(100)
+        await fetchJobs()
+        showToast(onToast, '导入完成', 'success')
+        setIsFileImporting(false)
+        setTimeout(() => setImportProgress(0), 500)
+      }
+    } catch (error) { showToast(onToast, `导入失败：${error.message}`, 'error'); setIsFileImporting(false) }
+  }
+
   const filteredJobs = useMemo(() => {
     if (!searchCompany.trim()) return jobs
     const keyword = searchCompany.trim().toLowerCase()
@@ -300,9 +414,6 @@ export default function Jobs({ onToast }) {
     return job.enterprise_type || job.company_type || job.type || job.parsed?.enterprise_type || job.parsed?.company_type || '-'
   }
 
-  const batchButtonLabel = (action, label) => {
-    return batchAction === action ? '处理中...' : `${label} (${selectedIds.size})`
-  }
 
   const statusLabel = (status) => {
     switch (status) {
@@ -335,134 +446,142 @@ export default function Jobs({ onToast }) {
 
   return (
     <PageTransition>
-      <LiquidSectionHeader title="岗位列表" subtitle="管理已发现的岗位" icon={FileText} />
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <LiquidSectionHeader title="岗位" subtitle="发现和管理岗位" icon={FileText} />
+        <MagneticButton variant="primary" onClick={() => setShowImportModal(true)} style={{ marginTop: '8px' }}>
+          <Plus style={{ width: '14px', height: '14px', marginRight: '4px' }} />
+          导入岗位
+        </MagneticButton>
+      </div>
+
+      {/* Import modal */}
+      {showImportModal && (
+        <div className="liquid-modal-overlay" onClick={() => setShowImportModal(false)}>
+          <div className="liquid-modal" style={{ maxWidth: '600px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>导入岗位</h3>
+              <button className="btn btn-close" onClick={() => setShowImportModal(false)}>×</button>
+            </div>
+            <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid var(--border-color)' }}>
+              {[
+                { key: 'url', label: '粘贴 URL' },
+                { key: 'ai', label: 'AI 搜索' },
+                { key: 'file', label: 'JSON 文件' },
+              ].map(tab => (
+                <button key={tab.key}
+                  onClick={() => setImportTab(tab.key)}
+                  style={{
+                    padding: '10px 20px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: importTab === tab.key ? 600 : 400,
+                    background: importTab === tab.key ? 'var(--bg-primary)' : 'transparent',
+                    color: importTab === tab.key ? 'var(--primary-color)' : 'var(--text-secondary)',
+                    borderBottom: importTab === tab.key ? '2px solid var(--primary-color)' : '2px solid transparent',
+                    transition: 'all 0.2s'
+                  }}
+                >{tab.label}</button>
+              ))}
+            </div>
+            <div style={{ padding: '20px' }}>
+              {importTab === 'url' && (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input className="form-control" value={manualUrl} onChange={e => setManualUrl(e.target.value)} placeholder="粘贴公司官网岗位详情页 URL" style={{ flex: 1 }} />
+                  <MagneticButton variant="primary" className="btn-sm" onClick={() => { handleImportUrl(); setShowImportModal(false); }} disabled={isImportingUrl || !manualUrl.trim()}>
+                    {isImportingUrl ? '导入中...' : '导入'}
+                  </MagneticButton>
+                </div>
+              )}
+              {importTab === 'ai' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '4px' }}>专业方向 <span style={{ color: 'var(--error-color)' }}>*</span></label>
+                      <input className="form-control" value={aiDirection} onChange={e => setAiDirection(e.target.value)} placeholder="如：数据分析、Java开发" />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '4px' }}>城市</label>
+                      <input className="form-control" value={aiCity} onChange={e => setAiCity(e.target.value)} placeholder="如：上海、北京" />
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '4px' }}>企业性质</label>
+                      <select className="form-control" value={aiEnterpriseType} onChange={e => setAiEnterpriseType(e.target.value)}>
+                        {ENTERPRISE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '4px' }}>职位层级</label>
+                      <select className="form-control" value={aiJobLevel} onChange={e => setAiJobLevel(e.target.value)}>
+                        {JOB_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <MagneticButton variant="primary" onClick={() => { handleAiSearch(); setShowImportModal(false); }} disabled={isAiSearching || !aiDirection.trim()}>
+                    {isAiSearching ? '搜索中...' : '开始搜索'}
+                  </MagneticButton>
+                </div>
+              )}
+              {importTab === 'file' && (
+                <div style={{
+                  padding: '24px', border: `2px dashed ${isDragging ? 'var(--primary-color)' : 'var(--border-light)'}`,
+                  borderRadius: '8px', backgroundColor: isDragging ? 'var(--primary-tint)' : 'var(--bg-secondary)',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', transition: 'all 0.3s ease'
+                }}
+                  onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={(e) => { handleDrop(e); setShowImportModal(false); }}>
+                  <Upload style={{ width: '24px', height: '24px', marginBottom: '8px', color: isDragging ? 'var(--primary-color)' : 'var(--text-secondary)' }} />
+                  <label className="btn btn-secondary" style={{ cursor: 'pointer' }}>
+                    {isFileImporting ? '导入中...' : '选择文件或拖拽到此处'}
+                    <input type="file" accept=".json" onChange={(e) => { handleFileImport(e); setShowImportModal(false); }} disabled={isFileImporting} style={{ display: 'none' }} />
+                  </label>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <LiquidCard delay={0}>
-        <div className="card-header">
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="form-control" style={{ width: '140px' }}>
-              <option value="all">全部状态</option>
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="form-control" style={{ width: '120px' }}>
+              <option value="all">全部 ({jobs.length})</option>
               <option value="active">有效</option>
               <option value="closed">已关闭</option>
               <option value="unconfirmed">未确认</option>
             </select>
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-              <input
-                className="form-control"
-                placeholder="搜索公司名..."
-                value={searchCompany}
-                onChange={(e) => setSearchCompany(e.target.value)}
-                style={{ width: '180px', paddingRight: '30px' }}
-              />
+              <input className="form-control" placeholder="搜公司..." value={searchCompany} onChange={(e) => setSearchCompany(e.target.value)} style={{ width: '150px', paddingRight: '28px' }} />
               <MagnifyingGlass style={{ position: 'absolute', right: '8px', width: '14px', height: '14px', color: 'var(--text-muted)' }} />
             </div>
+            <select value={selectedProvider} onChange={(e) => setSelectedProvider(e.target.value)} className="form-control" style={{ width: '180px', fontSize: '12px' }}>
+              {providers.map(provider => (
+                <option key={provider.id} value={provider.id}>{provider.label}{provider.configured ? '' : ' (未配置)'}</option>
+              ))}
+            </select>
           </div>
-          <div className="btn-group">
-            <MagneticButton
-              variant="secondary"
-              className="btn-sm"
-              onClick={handleSelectAll}
-              disabled={filteredJobs.length === 0 || Boolean(batchAction)}
-              title="选择或取消选择当前筛选结果"
-            >
-              {selectedIds.size === filteredJobs.length && filteredJobs.length > 0 ? (
-                <CheckSquare style={{ width: '14px', height: '14px', marginRight: '6px' }} />
-              ) : (
-                <Square style={{ width: '14px', height: '14px', marginRight: '6px' }} />
-              )}
-              全选当前列表
-            </MagneticButton>
-            {selectedIds.size > 0 && (
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            {selectedIds.size > 0 ? (
               <>
-                <MagneticButton
-                  variant="secondary"
-                  className="btn-sm"
-                  onClick={() => handleBatchAction('liveness')}
-                  disabled={Boolean(batchAction) || isBatchDeleting}
-                  title="批量检查选中岗位有效性"
-                >
-                  {batchAction === 'liveness' ? (
-                    <Spinner style={{ width: '14px', height: '14px', marginRight: '6px', animation: 'spin 1s linear infinite' }} />
-                  ) : (
-                    <CheckCircle style={{ width: '14px', height: '14px', marginRight: '6px' }} />
-                  )}
-                  {batchButtonLabel('liveness', '批量检查')}
+                <span style={{ fontSize: '13px', color: 'var(--text-secondary)', marginRight: '4px' }}>{selectedIds.size} 项</span>
+                <MagneticButton variant="secondary" className="btn-sm" onClick={() => handleBatchAction('extract')} disabled={Boolean(batchAction)}>
+                  {batchAction === 'extract' ? <Spinner style={{ width: '12px', height: '12px' }} /> : '提取'}
                 </MagneticButton>
-                <MagneticButton
-                  variant="primary"
-                  className="btn-sm"
-                  onClick={() => handleBatchAction('extract')}
-                  disabled={Boolean(batchAction) || isBatchDeleting}
-                  title="批量提取选中岗位详情"
-                >
-                  {batchAction === 'extract' ? (
-                    <Spinner style={{ width: '14px', height: '14px', marginRight: '6px', animation: 'spin 1s linear infinite' }} />
-                  ) : (
-                    <ArrowsClockwise style={{ width: '14px', height: '14px', marginRight: '6px' }} />
-                  )}
-                  {batchButtonLabel('extract', '批量提取')}
+                <MagneticButton variant="secondary" className="btn-sm" onClick={() => handleBatchAction('evaluate')} disabled={Boolean(batchAction)}>
+                  {batchAction === 'evaluate' ? <Spinner style={{ width: '12px', height: '12px' }} /> : '评分'}
                 </MagneticButton>
-                <MagneticButton
-                  variant="primary"
-                  className="btn-sm"
-                  onClick={() => handleBatchAction('optimize')}
-                  disabled={Boolean(batchAction) || isBatchDeleting}
-                  title="批量 AI 优化选中岗位的 JD"
-                >
-                  {batchAction === 'optimize' ? (
-                    <Spinner style={{ width: '14px', height: '14px', marginRight: '6px', animation: 'spin 1s linear infinite' }} />
-                  ) : (
-                    <ArrowsClockwise style={{ width: '14px', height: '14px', marginRight: '6px' }} />
-                  )}
-                  {batchButtonLabel('optimize', '批量优化JD')}
+                <MagneticButton variant="primary" className="btn-sm" onClick={() => setShowConfirmModal(true)} disabled={isBatchDeleting}>
+                  <Trash style={{ width: '12px', height: '12px', marginRight: '2px' }} />删除
                 </MagneticButton>
-                <MagneticButton
-                  variant="secondary"
-                  className="btn-sm"
-                  onClick={() => handleBatchAction('evaluate')}
-                  disabled={Boolean(batchAction) || isBatchDeleting}
-                  title="批量 AI 评分选中岗位"
-                >
-                  {batchAction === 'evaluate' ? (
-                    <Spinner style={{ width: '14px', height: '14px', marginRight: '6px', animation: 'spin 1s linear infinite' }} />
-                  ) : (
-                    <FileText style={{ width: '14px', height: '14px', marginRight: '6px' }} />
-                  )}
-                  {batchButtonLabel('evaluate', '批量评分')}
+              </>
+            ) : (
+              <>
+                <MagneticButton variant="secondary" className="btn-sm" onClick={handleSelectAll} disabled={filteredJobs.length === 0}>
+                  {selectedIds.size === filteredJobs.length && filteredJobs.length > 0 ? <CheckSquare style={{ width: '14px', height: '14px' }} /> : <Square style={{ width: '14px', height: '14px' }} />}
                 </MagneticButton>
-                <MagneticButton 
-                  variant="primary"
-                  className="btn-sm" 
-                  onClick={() => setShowConfirmModal(true)}
-                  disabled={isBatchDeleting || Boolean(batchAction)}
-                  style={{ marginRight: '8px' }}
-                >
-                  {isBatchDeleting ? (
-                    <>
-                      <Spinner style={{ width: '14px', height: '14px', marginRight: '6px', animation: 'spin 1s linear infinite' }} />
-                      删除中...
-                    </>
-                  ) : (
-                    <>
-                      <Trash style={{ width: '14px', height: '14px', marginRight: '6px' }} />
-                      批量删除 ({selectedIds.size})
-                    </>
-                  )}
+                <MagneticButton variant="secondary" className="btn-sm" onClick={handleValidate} title="校验数据完整性">
+                  <Warning style={{ width: '14px', height: '14px' }} />
                 </MagneticButton>
               </>
             )}
-            <select value={selectedProvider} onChange={(e) => setSelectedProvider(e.target.value)} className="form-control" style={{ width: '220px' }}>
-              {providers.length === 0 && <option value="deepseek">DeepSeek</option>}
-              {providers.map(provider => (
-                <option key={provider.id} value={provider.id}>
-                  {provider.label} {provider.configured ? `(${provider.model})` : '(未配置 Key)'}
-                </option>
-              ))}
-            </select>
-            <MagneticButton variant="secondary" className="btn-sm" onClick={handleValidate} title="校验岗位数据完整性">
-              <Warning style={{ width: '14px', height: '14px', marginRight: '6px' }} />
-              数据校验
-            </MagneticButton>
           </div>
         </div>
 
