@@ -3,6 +3,7 @@ cv.md
 data/applications.md
 data/pipeline.md
 data/scan-history.tsv
+data/follow-ups.md
 reports/*.md
 !reports/.gitkeep
 output/*
@@ -35,7 +36,7 @@ data/job-radar/resume-photo.png
 # Build output
 gui/dist/
 
-# User template
+# User template (filled by user)
 template.JSON
 Template.JSON
 
@@ -62,3 +63,15 @@ bun.lock
 .claude/memory/
 career-dashboard
 package-lock.json
+
+# Test files (development only)
+test_*.py
+test_*.js
+test_output/
+*.png
+*.screenshot.png
+
+# Debug files
+boss_*.js
+boss_*.png
+jobs.jsonl
