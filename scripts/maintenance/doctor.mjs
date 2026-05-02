@@ -121,42 +121,80 @@ function checkNodeVersion() {
   };
 }
 
+function isDependencyTreeValid(dir) {
+  // npm ls --json 输出 problems 数组表示有缺失/无效依赖
+  const result = runCommand(npmCommand, ['ls', '--depth=0', '--json'], dir);
+  if (!result.pass) return false;
+  try {
+    const parsed = JSON.parse(result.output);
+    return !parsed.problems || parsed.problems.length === 0;
+  } catch {
+    return false;
+  }
+}
+
 function checkDependencies() {
-  if (existsSync(join(projectRoot, 'node_modules'))) {
+  if (!existsSync(join(projectRoot, 'node_modules'))) {
+    // node_modules 不存在，全新安装
+    const installResult = installNpmDependenciesWithRetry(projectRoot, 'root');
+    if (installResult.pass) {
+      return { pass: true, label: `Root dependencies installed (via ${installResult.registry} mirror)` };
+    }
+    return {
+      pass: false,
+      label: 'Root dependencies not installed',
+      fix: ['Automatic installation failed.', 'Please try manually: npm install', installResult.error],
+    };
+  }
+
+  // node_modules 存在，检测依赖树是否完整
+  if (isDependencyTreeValid(projectRoot)) {
     return { pass: true, label: 'Root dependencies installed' };
   }
+
+  // 依赖不完整，补装
+  console.log(`  ${yellow('Root dependencies incomplete, syncing...')}`);
   const installResult = installNpmDependenciesWithRetry(projectRoot, 'root');
   if (installResult.pass) {
-    return { pass: true, label: `Root dependencies installed (via ${installResult.registry} mirror)` };
+    return { pass: true, label: `Root dependencies synced (via ${installResult.registry} mirror)` };
   }
   return {
     pass: false,
-    label: 'Root dependencies not installed',
-    fix: [
-      'Automatic installation failed.',
-      'Please try manually: npm install',
-      installResult.error,
-    ],
+    label: 'Root dependencies sync failed',
+    fix: ['Automatic sync failed.', 'Please try manually: npm install', installResult.error],
   };
 }
 
 function checkGuiDependencies() {
   const guiRoot = join(projectRoot, 'gui');
-  if (existsSync(join(guiRoot, 'node_modules'))) {
+  if (!existsSync(join(guiRoot, 'node_modules'))) {
+    // node_modules 不存在，全新安装
+    const installResult = installNpmDependenciesWithRetry(guiRoot, 'GUI');
+    if (installResult.pass) {
+      return { pass: true, label: `GUI dependencies installed (via ${installResult.registry} mirror)` };
+    }
+    return {
+      pass: false,
+      label: 'GUI dependencies not installed',
+      fix: ['Automatic installation failed.', 'Please try manually: cd gui && npm install', installResult.error],
+    };
+  }
+
+  // node_modules 存在，检测依赖树是否完整
+  if (isDependencyTreeValid(guiRoot)) {
     return { pass: true, label: 'GUI dependencies installed' };
   }
+
+  // 依赖不完整，补装
+  console.log(`  ${yellow('GUI dependencies incomplete, syncing...')}`);
   const installResult = installNpmDependenciesWithRetry(guiRoot, 'GUI');
   if (installResult.pass) {
-    return { pass: true, label: `GUI dependencies installed (via ${installResult.registry} mirror)` };
+    return { pass: true, label: `GUI dependencies synced (via ${installResult.registry} mirror)` };
   }
   return {
     pass: false,
-    label: 'GUI dependencies not installed',
-    fix: [
-      'Automatic installation failed.',
-      'Please try manually: cd gui && npm install',
-      installResult.error,
-    ],
+    label: 'GUI dependencies sync failed',
+    fix: ['Automatic sync failed.', 'Please try manually: cd gui && npm install', installResult.error],
   };
 }
 
