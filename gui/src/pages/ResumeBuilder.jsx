@@ -1,20 +1,26 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { FileText, FileImage, CheckCircle, Save, Upload, GripVertical, Plus, Trash2, Edit3, Edit2, Eye, EyeOff, X, ChevronDown, ChevronUp, User, Briefcase, GraduationCap, FolderOpen, Mail, Phone, MapPin, Calendar } from 'lucide-react'
+import { FileText, FileImage, CheckCircle, FloppyDisk, Upload, DotsSixVertical, Plus, PencilSimple, PencilSimpleLine, Eye, EyeSlash, X, CaretDown, CaretUp, User, Briefcase, GraduationCap, FolderOpen, Download, CopySimple, ArrowClockwise, Warning, FileArrowUp, Trash, Sparkle } from '@phosphor-icons/react'
 import { aiAPI, jobsAPI, resumeAPI } from '../api'
 import { showToast } from '../utils/toast'
+import { PageTransition, LiquidSectionHeader, LiquidCard, MagneticButton, ScrollReveal } from '../components/LiquidMotion'
+import '../styles/liquid-motion.css'
+
+/* ── 子组件 ── */
 
 function SectionHeader({ icon: Icon, title, description, actions, onToggle, isExpanded }) {
   return (
     <div className={`section-header${onToggle ? ' clickable' : ''}`} onClick={onToggle}>
       <div className="section-title">
-        <Icon className="section-icon" />
+        <Icon className="section-icon" weight="duotone" />
         <div>
           <h3>{title}</h3>
           {description && <p>{description}</p>}
         </div>
       </div>
-      {actions}
-      {onToggle && (isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />)}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {actions}
+        {onToggle && (isExpanded ? <CaretUp size={18} /> : <CaretDown size={18} />)}
+      </div>
     </div>
   )
 }
@@ -22,9 +28,9 @@ function SectionHeader({ icon: Icon, title, description, actions, onToggle, isEx
 function FormInput({ label, name, value, onChange, type = 'text', placeholder, required = false, error, disabled = false }) {
   return (
     <div className="form-item">
-      <label>
+      <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>
         {label}
-        {required && <span className="required">*</span>}
+        {required && <span style={{ color: 'var(--danger-color)', marginLeft: '2px' }}>*</span>}
       </label>
       <input
         type={type}
@@ -33,9 +39,9 @@ function FormInput({ label, name, value, onChange, type = 'text', placeholder, r
         onChange={(e) => onChange(name, e.target.value)}
         placeholder={placeholder}
         disabled={disabled}
-        className={`form-input ${error ? 'error' : ''}`}
+        className={`form-control ${error ? 'error' : ''}`}
       />
-      {error && <span className="error-message">{error}</span>}
+      {error && <span style={{ fontSize: '12px', color: 'var(--danger-color)', marginTop: '4px', display: 'block' }}>{error}</span>}
     </div>
   )
 }
@@ -43,9 +49,9 @@ function FormInput({ label, name, value, onChange, type = 'text', placeholder, r
 function FormTextarea({ label, name, value, onChange, rows = 3, placeholder, required = false, error }) {
   return (
     <div className="form-item">
-      <label>
+      <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>
         {label}
-        {required && <span className="required">*</span>}
+        {required && <span style={{ color: 'var(--danger-color)', marginLeft: '2px' }}>*</span>}
       </label>
       <textarea
         name={name}
@@ -53,16 +59,16 @@ function FormTextarea({ label, name, value, onChange, rows = 3, placeholder, req
         onChange={(e) => onChange(name, e.target.value)}
         placeholder={placeholder}
         rows={rows}
-        className={`form-input ${error ? 'error' : ''}`}
+        className={`form-control ${error ? 'error' : ''}`}
       />
-      {error && <span className="error-message">{error}</span>}
+      {error && <span style={{ fontSize: '12px', color: 'var(--danger-color)', marginTop: '4px', display: 'block' }}>{error}</span>}
     </div>
   )
 }
 
 const YEAR_MIN = 2000
 const YEAR_MAX = 2050
-const MONTHS = ['01','02','03','04','05','06','07','08','09','10','11','12']
+const MONTHS = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12']
 const YEAR_OPTIONS = Array.from({ length: YEAR_MAX - YEAR_MIN + 1 }, (_, i) => YEAR_MIN + i)
 
 function parseDateVal(v) {
@@ -73,21 +79,19 @@ function parseDateVal(v) {
 
 function MonthSelect({ value, onChange }) {
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value)} className="date-select date-select-month">
+    <select value={value} onChange={(e) => onChange(e.target.value)} className="form-control" style={{ width: '70px' }}>
       <option value="">月</option>
       {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
     </select>
   )
 }
 
-function YearSelect({ value, onChange, onToggleFold }) {
+function YearSelect({ value, onChange }) {
   return (
-    <div className="date-year-wrap" onClick={onToggleFold}>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="date-select date-select-year" onClick={(e) => e.stopPropagation()}>
-        <option value="">年</option>
-        {YEAR_OPTIONS.map(y => <option key={y} value={String(y)}>{y}</option>)}
-      </select>
-    </div>
+    <select value={value} onChange={(e) => onChange(e.target.value)} className="form-control" style={{ width: '90px' }}>
+      <option value="">年</option>
+      {YEAR_OPTIONS.map(y => <option key={y} value={String(y)}>{y}</option>)}
+    </select>
   )
 }
 
@@ -95,7 +99,6 @@ function DateField({ value, onChange }) {
   const parsed = parseDateVal(value)
   const [year, setYear] = useState(parsed.year)
   const [month, setMonth] = useState(parsed.month)
-  const [folded, setFolded] = useState(false)
 
   useEffect(() => {
     const next = parseDateVal(value)
@@ -113,37 +116,37 @@ function DateField({ value, onChange }) {
   }
 
   return (
-    <div className={`date-field ${folded ? 'folded' : ''}`}>
-      <YearSelect value={year} onChange={updateYear} onToggleFold={() => setFolded(f => !f)} />
-      {!folded && <MonthSelect value={month} onChange={updateMonth} />}
+    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+      <YearSelect value={year} onChange={updateYear} />
+      <MonthSelect value={month} onChange={updateMonth} />
     </div>
   )
 }
 
 function DateRangePicker({ startName, endName, startValue, endValue, onChange }) {
   return (
-    <div className="date-range">
-      <div className="form-item">
-        <label>开始时间</label>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+      <div className="form-item" style={{ marginBottom: 0 }}>
+        <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>开始时间</label>
         <input
           type="month"
           value={startValue || ''}
           onChange={(e) => onChange(startName, e.target.value)}
-          className="form-input"
+          className="form-control"
         />
       </div>
-      <span className="date-separator">~</span>
-      <div className="form-item">
-        <label>结束时间</label>
+      <span style={{ color: 'var(--text-muted)', paddingTop: '20px' }}>~</span>
+      <div className="form-item" style={{ marginBottom: 0 }}>
+        <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>结束时间</label>
         <input
           type="month"
           value={endValue === 'present' ? '' : (endValue || '')}
           onChange={(e) => onChange(endName, e.target.value)}
-          className="form-input"
+          className="form-control"
           placeholder={endValue === 'present' ? '至今' : ''}
         />
         {endValue === 'present' && (
-          <span className="present-badge">至今</span>
+          <span style={{ fontSize: '12px', color: 'var(--success-color)', marginTop: '4px', display: 'block' }}>至今</span>
         )}
       </div>
     </div>
@@ -153,18 +156,19 @@ function DateRangePicker({ startName, endName, startValue, endValue, onChange })
 function StructuredDateRangePicker({ startName, endName, startValue, endValue, onChange }) {
   const isPresent = endValue === 'present'
   return (
-    <div className="date-range-picker">
+    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
       <DateField value={startValue} onChange={(value) => onChange(startName, value)} />
-      <span className="date-arrow">→</span>
+      <span style={{ color: 'var(--text-muted)' }}>→</span>
       {isPresent
-        ? <span className="date-present">至今</span>
+        ? <span style={{ fontSize: '14px', color: 'var(--success-color)', fontWeight: 500 }}>至今</span>
         : <DateField value={endValue} onChange={(value) => onChange(endName, value)} />
       }
       <button
         type="button"
-        className={`date-toggle-present ${isPresent ? 'active' : ''}`}
+        className={`btn btn-sm ${isPresent ? 'btn-success' : 'btn-secondary'}`}
         onClick={() => onChange(endName, isPresent ? '' : 'present')}
         title={isPresent ? '取消至今' : '设为至今'}
+        style={{ padding: '4px 12px', fontSize: '12px' }}
       >
         至今
       </button>
@@ -174,22 +178,26 @@ function StructuredDateRangePicker({ startName, endName, startValue, endValue, o
 
 function EducationItem({ item, index, onChange, onDelete }) {
   return (
-    <div className="timeline-item">
-      <div className="timeline-header">
-        <div className="timeline-dates">
-          <StructuredDateRangePicker
-            startName={`education[${index}].start_date`}
-            endName={`education[${index}].end_date`}
-            startValue={item.start_date}
-            endValue={item.end_date}
-            onChange={onChange}
-          />
-        </div>
-        <button className="btn-delete" onClick={() => onDelete(index)}>
+    <div className="timeline-item" style={{
+      background: 'var(--bg-secondary)',
+      borderRadius: '16px',
+      padding: '20px',
+      marginBottom: '16px',
+      border: '1px solid var(--border-color)'
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+        <StructuredDateRangePicker
+          startName={`education[${index}].start_date`}
+          endName={`education[${index}].end_date`}
+          startValue={item.start_date}
+          endValue={item.end_date}
+          onChange={onChange}
+        />
+        <button className="btn btn-danger btn-sm" onClick={() => onDelete(index)} style={{ padding: '6px' }}>
           <X size={16} />
         </button>
       </div>
-      <div className="form-grid-2">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
         <FormInput
           label="学校名称"
           name={`education[${index}].school`}
@@ -235,22 +243,26 @@ function EducationItem({ item, index, onChange, onDelete }) {
 
 function ExperienceItem({ item, index, onChange, onDelete }) {
   return (
-    <div className="timeline-item">
-      <div className="timeline-header">
-        <div className="timeline-dates">
-          <DateRangePicker
-            startName={`experience[${index}].start_date`}
-            endName={`experience[${index}].end_date`}
-            startValue={item.start_date}
-            endValue={item.end_date}
-            onChange={onChange}
-          />
-        </div>
-        <button className="btn-delete" onClick={() => onDelete(index)}>
+    <div className="timeline-item" style={{
+      background: 'var(--bg-secondary)',
+      borderRadius: '16px',
+      padding: '20px',
+      marginBottom: '16px',
+      border: '1px solid var(--border-color)'
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+        <DateRangePicker
+          startName={`experience[${index}].start_date`}
+          endName={`experience[${index}].end_date`}
+          startValue={item.start_date}
+          endValue={item.end_date}
+          onChange={onChange}
+        />
+        <button className="btn btn-danger btn-sm" onClick={() => onDelete(index)} style={{ padding: '6px' }}>
           <X size={16} />
         </button>
       </div>
-      <div className="form-grid-2">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
         <FormInput
           label="公司名称"
           name={`experience[${index}].company`}
@@ -290,22 +302,26 @@ function ExperienceItem({ item, index, onChange, onDelete }) {
 
 function ProjectItem({ item, index, onChange, onDelete }) {
   return (
-    <div className="timeline-item">
-      <div className="timeline-header">
-        <div className="timeline-dates">
-          <StructuredDateRangePicker
-            startName={`projects[${index}].start_date`}
-            endName={`projects[${index}].end_date`}
-            startValue={item.start_date}
-            endValue={item.end_date}
-            onChange={onChange}
-          />
-        </div>
-        <button className="btn-delete" onClick={() => onDelete(index)}>
+    <div className="timeline-item" style={{
+      background: 'var(--bg-secondary)',
+      borderRadius: '16px',
+      padding: '20px',
+      marginBottom: '16px',
+      border: '1px solid var(--border-color)'
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+        <StructuredDateRangePicker
+          startName={`projects[${index}].start_date`}
+          endName={`projects[${index}].end_date`}
+          startValue={item.start_date}
+          endValue={item.end_date}
+          onChange={onChange}
+        />
+        <button className="btn btn-danger btn-sm" onClick={() => onDelete(index)} style={{ padding: '6px' }}>
           <X size={16} />
         </button>
       </div>
-      <div className="form-grid-2">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
         <FormInput
           label="项目名称"
           name={`projects[${index}].name`}
@@ -340,40 +356,66 @@ function ProjectItem({ item, index, onChange, onDelete }) {
   )
 }
 
-function ModuleItem({ module, index, onToggle, onEdit, onDelete, onEditData, onDragStart, onDragOver, onDrop, dragIndex, dragOverIndex }) {
+function ModuleItem({ module, index, onToggle, onEdit, onDelete, onEditData, onDragStart, onDragOver, onDrop, onDragEnd, dragIndex, dragOverIndex }) {
   const isDragging = dragIndex === index
   const isDragOver = dragOverIndex === index
   const builtinDataModules = ['education', 'experience', 'projects']
   const isDataModule = module.type === 'builtin' && builtinDataModules.includes(module.id)
-  
+
   return (
     <div
       draggable
       onDragStart={(e) => onDragStart(e, index)}
       onDragOver={(e) => onDragOver(e, index)}
       onDrop={(e) => onDrop(e, index)}
+      onDragEnd={onDragEnd}
       className={`module-item ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        padding: '14px 16px',
+        background: 'var(--bg-secondary)',
+        borderRadius: '12px',
+        marginBottom: '8px',
+        border: '1px solid var(--border-color)',
+        cursor: 'grab',
+        opacity: isDragging ? 0.5 : 1,
+        transition: 'all 0.2s ease'
+      }}
     >
-      <GripVertical className="drag-handle" />
-      <span className="module-name" style={{ color: module.enabled ? undefined : 'var(--text-muted)' }}>
+      <DotsSixVertical size={18} style={{ color: 'var(--text-muted)', cursor: 'grab', flexShrink: 0 }} />
+      <span style={{
+        flex: 1,
+        fontSize: '14px',
+        fontWeight: 500,
+        color: module.enabled ? 'var(--text-primary)' : 'var(--text-muted)'
+      }}>
         {module.name}
-        {module.type === 'custom' && <span className="custom-badge">自定义</span>}
+        {module.type === 'custom' && <span style={{
+          marginLeft: '8px',
+          fontSize: '11px',
+          padding: '2px 8px',
+          background: 'var(--haze-blue-100)',
+          color: 'var(--haze-blue-700)',
+          borderRadius: '12px'
+        }}>自定义</span>}
       </span>
-      <div className="module-actions">
-        <button title={module.enabled ? '隐藏此模块' : '显示此模块'} onClick={() => onToggle(index)} className="action-btn">
-          {module.enabled ? <Eye size={16} /> : <EyeOff size={16} />}
+      <div style={{ display: 'flex', gap: '4px' }}>
+        <button title={module.enabled ? '隐藏此模块' : '显示此模块'} onClick={() => onToggle(index)} className="btn btn-sm btn-secondary" style={{ padding: '6px' }}>
+          {module.enabled ? <Eye size={16} /> : <EyeSlash size={16} />}
         </button>
         {isDataModule ? (
-          <button title="编辑数据" onClick={() => onEditData(module.id)} className="action-btn">
-            <Edit2 size={16} />
+          <button title="编辑数据" onClick={() => onEditData(module.id)} className="btn btn-sm btn-secondary" style={{ padding: '6px' }}>
+            <PencilSimpleLine size={16} />
           </button>
         ) : (
-          <button title="编辑" onClick={() => onEdit(index)} className="action-btn">
-            <Edit3 size={16} />
+          <button title="编辑" onClick={() => onEdit(index)} className="btn btn-sm btn-secondary" style={{ padding: '6px' }}>
+            <PencilSimple size={16} />
           </button>
         )}
-        <button title="删除" onClick={() => onDelete(index)} className="action-btn danger">
-          <Trash2 size={16} />
+        <button title="删除" onClick={() => onDelete(index)} className="btn btn-sm btn-danger" style={{ padding: '6px' }}>
+          <Trash size={16} />
         </button>
       </div>
     </div>
@@ -415,16 +457,22 @@ function AddModuleForm({ onAdd, onCancel }) {
         : '添加'
 
   return (
-    <div className="add-module-form">
+    <div style={{
+      background: 'var(--bg-secondary)',
+      borderRadius: '16px',
+      padding: '20px',
+      marginBottom: '16px',
+      border: '1px solid var(--border-color)'
+    }}>
       <div className="form-item">
-        <label>模块名称 <span className="required">*</span></label>
-        <input ref={nameRef} className="form-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="如：实习经历、资格证书" />
+        <label style={{ fontSize: '13px', fontWeight: 500 }}>模块名称 <span style={{ color: 'var(--danger-color)' }}>*</span></label>
+        <input ref={nameRef} className="form-control" value={name} onChange={(e) => setName(e.target.value)} placeholder="如：实习经历、资格证书" />
       </div>
       <div className="form-item">
-        <label>模块内容</label>
-        <textarea className="form-input" rows="3" value={content} onChange={(e) => setContent(e.target.value)} placeholder="在此输入该模块要展示的文本内容" />
+        <label style={{ fontSize: '13px', fontWeight: 500 }}>模块内容</label>
+        <textarea className="form-control" rows="3" value={content} onChange={(e) => setContent(e.target.value)} placeholder="在此输入该模块要展示的文本内容" />
       </div>
-      <div className="form-actions">
+      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
         <button className="btn btn-primary btn-sm" onClick={handleSubmit} disabled={!name.trim() || saveStatus === 'saving'}>{submitLabel}</button>
         <button className="btn btn-secondary btn-sm" onClick={onCancel}>取消</button>
       </div>
@@ -462,16 +510,22 @@ function EditModuleForm({ module, onSave, onCancel }) {
         : '保存'
 
   return (
-    <div className="add-module-form">
+    <div style={{
+      background: 'var(--bg-secondary)',
+      borderRadius: '16px',
+      padding: '20px',
+      marginBottom: '16px',
+      border: '1px solid var(--border-color)'
+    }}>
       <div className="form-item">
-        <label>模块名称 <span className="required">*</span></label>
-        <input className="form-input" value={name} onChange={(e) => setName(e.target.value)} />
+        <label style={{ fontSize: '13px', fontWeight: 500 }}>模块名称 <span style={{ color: 'var(--danger-color)' }}>*</span></label>
+        <input className="form-control" value={name} onChange={(e) => setName(e.target.value)} />
       </div>
       <div className="form-item">
-        <label>模块内容</label>
-        <textarea className="form-input" rows="3" value={content} onChange={(e) => setContent(e.target.value)} />
+        <label style={{ fontSize: '13px', fontWeight: 500 }}>模块内容</label>
+        <textarea className="form-control" rows="3" value={content} onChange={(e) => setContent(e.target.value)} />
       </div>
-      <div className="form-actions">
+      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
         <button className="btn btn-primary btn-sm" onClick={handleSubmit} disabled={!name.trim() || saveStatus === 'saving'}>{submitLabel}</button>
         <button className="btn btn-secondary btn-sm" onClick={onCancel}>取消</button>
       </div>
@@ -484,6 +538,102 @@ function resolvePhotoSrc(profile, photoPreview = '') {
   if (profile?.photoData) return profile.photoData
   if (profile?.photo_path) return `/api/resume/photo?path=${encodeURIComponent(profile.photo_path)}`
   return ''
+}
+
+function AiAutoFillModal({ isOpen, onClose, section, onFill, onToast }) {
+  const [inputText, setInputText] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [provider, setProvider] = useState('deepseek')
+
+  const handleFill = async () => {
+    if (!inputText.trim()) {
+      showToast(onToast, '请输入内容', 'error')
+      return
+    }
+    setIsGenerating(true)
+    try {
+      const res = await resumeAPI.autoFill({ provider, section, userInput: inputText.trim() })
+      onFill(res.data.result)
+      showToast(onToast, 'AI 补全成功', 'success')
+      onClose()
+    } catch (error) {
+      showToast(onToast, error?.response?.data?.error || error?.message || 'AI 补全失败', 'error')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  if (!isOpen) return null
+
+  const sectionLabels = {
+    education: '教育背景',
+    experience: '工作经历',
+    projects: '项目经验',
+    skills: '技能关键词'
+  }
+
+  const sectionExamples = {
+    education: '例如：20XX年9月到20XX年6月在XX大学读本科，专业是自动化，GPA是X.X，主修自动控制原理、单片机原理、电力电子技术，获得过校级奖学金',
+    experience: '例如：20XX年X月到X月在XX科技公司做嵌入式实习生，参与产线数据采集终端开发，负责串口通信、寄存器映射和现场联调，是核心开发',
+    projects: '例如：20XX年X月到X月作为项目负责人，基于STM32开发电机控制系统，完成电机调速控制、按键交互、OLED显示和故障保护逻辑，实现稳定闭环控制，使用C语言、STM32、PID、FreeRTOS',
+    skills: '例如：熟悉C语言编程，会使用STM32单片机，了解PLC编程和Modbus通信协议，掌握FreeRTOS实时操作系统'
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999,
+      background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center'
+    }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: 'var(--bg-primary)', borderRadius: '20px', padding: '32px',
+        maxWidth: '560px', width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+          <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Sparkle size={20} style={{ color: 'var(--primary-color)' }} />
+            AI 智能补全 - {sectionLabels[section]}
+          </h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', borderRadius: '8px' }}>
+            <X size={20} style={{ color: 'var(--text-muted)' }} />
+          </button>
+        </div>
+
+        <div style={{
+          background: 'var(--haze-blue-50)', borderRadius: '12px', padding: '12px 16px',
+          marginBottom: '16px', fontSize: '13px', color: 'var(--haze-blue-800)', display: 'flex', gap: '8px', alignItems: 'flex-start'
+        }}>
+          <Warning size={16} style={{ flexShrink: 0, marginTop: '1px' }} />
+          <div>用自然语言描述你的{sectionLabels[section]}，AI 将自动提取并补全结构化数据</div>
+        </div>
+
+        <div className="form-group" style={{ marginBottom: '16px' }}>
+          <label>选择 AI 模型</label>
+          <select value={provider} onChange={(e) => setProvider(e.target.value)} className="form-control">
+            <option value="deepseek">DeepSeek</option>
+            <option value="doubao">豆包 / 火山方舟</option>
+          </select>
+        </div>
+
+        <textarea
+          className="form-control"
+          rows={8}
+          value={inputText}
+          onChange={(e) => setInputText(e.target.value)}
+          placeholder={sectionExamples[section]}
+          style={{ resize: 'vertical', fontSize: '14px', lineHeight: '1.7' }}
+        />
+
+        <div style={{ display: 'flex', gap: '12px', marginTop: '16px', justifyContent: 'flex-end' }}>
+          <button className="btn btn-secondary" onClick={onClose} disabled={isGenerating}>取消</button>
+          <button className="btn btn-primary" onClick={handleFill} disabled={isGenerating || !inputText.trim()}>
+            <Sparkle size={16} style={{ marginRight: '6px' }} />
+            {isGenerating ? 'AI 补全中...' : '开始补全'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function PreviewModal({ profile, education, experience, projects, modules, photoPreview, onClose }) {
@@ -548,19 +698,28 @@ function PreviewModal({ profile, education, experience, projects, modules, photo
     .filter(Boolean)
 
   const renderSectionTitle = (title) => (
-    <div className="resume-preview-section-title">
-      <span className="line" />
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      margin: '20px 0 12px',
+      fontSize: '15px',
+      fontWeight: 600,
+      color: 'var(--text-primary)',
+      fontFamily: 'var(--font-serif)'
+    }}>
+      <span style={{ flex: 1, height: '1px', background: 'var(--border-color)' }} />
       <span>{title}</span>
-      <span className="line" />
+      <span style={{ flex: 1, height: '1px', background: 'var(--border-color)' }} />
     </div>
   )
 
   const renderModule = (mod) => {
     if (mod.type === 'custom' && mod.content) {
       return (
-        <section key={mod.id} className="resume-preview-section">
+        <section key={mod.id} style={{ marginBottom: '16px' }}>
           {renderSectionTitle(mod.name)}
-          <p className="resume-preview-paragraph" style={{ whiteSpace: 'pre-line' }}>{mod.content}</p>
+          <p style={{ fontSize: '13px', lineHeight: '1.7', color: 'var(--text-primary)', whiteSpace: 'pre-line' }}>{mod.content}</p>
         </section>
       )
     }
@@ -568,9 +727,9 @@ function PreviewModal({ profile, education, experience, projects, modules, photo
     switch (mod.id) {
       case 'summary':
         return hasText(profile.summary) ? (
-          <section key="summary" className="resume-preview-section">
+          <section key="summary" style={{ marginBottom: '16px' }}>
             {renderSectionTitle('求职定位')}
-            <p className="resume-preview-paragraph">{asText(profile.summary)}</p>
+            <p style={{ fontSize: '13px', lineHeight: '1.7', color: 'var(--text-primary)' }}>{asText(profile.summary)}</p>
           </section>
         ) : null
       case 'skills': {
@@ -578,11 +737,17 @@ function PreviewModal({ profile, education, experience, projects, modules, photo
         if (!skillsText) return null
         const skillItems = skillsText.split(/[、,，|]/).filter(Boolean)
         return (
-          <section key="skills" className="resume-preview-section">
+          <section key="skills" style={{ marginBottom: '16px' }}>
             {renderSectionTitle('核心能力')}
-            <div className="resume-preview-skill-line">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
               {skillItems.map((s, i) => (
-                <span key={i} className="resume-preview-skill-item">{s.trim()}</span>
+                <span key={i} style={{
+                  fontSize: '12px',
+                  padding: '4px 12px',
+                  background: 'var(--haze-blue-100)',
+                  color: 'var(--haze-blue-800)',
+                  borderRadius: '12px'
+                }}>{s.trim()}</span>
               ))}
             </div>
           </section>
@@ -590,17 +755,17 @@ function PreviewModal({ profile, education, experience, projects, modules, photo
       }
       case 'experience':
         return previewExperience.length > 0 ? (
-          <section key="experience" className="resume-preview-section">
+          <section key="experience" style={{ marginBottom: '16px' }}>
             {renderSectionTitle('工作经历')}
             {previewExperience.map((item, i) => (
-              <div key={i} className="resume-preview-item">
-                <div className="resume-preview-item-head">
+              <div key={i} style={{ marginBottom: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 500 }}>
                   <span>{[asText(item.company), asText(item.position)].filter(Boolean).join(' | ')}</span>
-                  <span className="resume-preview-muted">{formatDate(item.start_date)} ~ {formatDate(item.end_date)}</span>
+                  <span style={{ color: 'var(--text-muted)' }}>{formatDate(item.start_date)} ~ {formatDate(item.end_date)}</span>
                 </div>
-                {hasText(item.role) && <div className="resume-preview-subline">分工：{asText(item.role)}</div>}
+                {hasText(item.role) && <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>分工：{asText(item.role)}</div>}
                 {renderBulletLines(item.description).length > 0 && (
-                  <ul className="resume-preview-bullets">
+                  <ul style={{ margin: '6px 0 0 16px', padding: 0, fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.7' }}>
                     {renderBulletLines(item.description).map((line, idx) => <li key={idx}>{line}</li>)}
                   </ul>
                 )}
@@ -610,18 +775,18 @@ function PreviewModal({ profile, education, experience, projects, modules, photo
         ) : null
       case 'projects':
         return previewProjects.length > 0 ? (
-          <section key="projects" className="resume-preview-section">
+          <section key="projects" style={{ marginBottom: '16px' }}>
             {renderSectionTitle('项目经历')}
             {previewProjects.map((item, i) => (
-              <div key={i} className="resume-preview-item">
-                <div className="resume-preview-item-head resume-preview-item-head-triplet">
+              <div key={i} style={{ marginBottom: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 500 }}>
                   <span>{asText(item.name)}</span>
-                  <span className="resume-preview-centered">{asText(item.role)}</span>
-                  <span className="resume-preview-muted resume-preview-right">{formatDate(item.start_date)} ~ {formatDate(item.end_date)}</span>
+                  <span style={{ color: 'var(--text-muted)' }}>{formatDate(item.start_date)} ~ {formatDate(item.end_date)}</span>
                 </div>
-                {hasText(item.tech_stack) && <div className="resume-preview-subline"><strong>技术栈：</strong>{asText(item.tech_stack)}</div>}
+                {hasText(item.role) && <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>角色：{asText(item.role)}</div>}
+                {hasText(item.tech_stack) && <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}><strong>技术栈：</strong>{asText(item.tech_stack)}</div>}
                 {renderBulletLines(item.description).length > 0 && (
-                  <ul className="resume-preview-bullets">
+                  <ul style={{ margin: '6px 0 0 16px', padding: 0, fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.7' }}>
                     {renderBulletLines(item.description).map((line, idx) => <li key={idx}>{line}</li>)}
                   </ul>
                 )}
@@ -631,16 +796,16 @@ function PreviewModal({ profile, education, experience, projects, modules, photo
         ) : null
       case 'education':
         return previewEducation.length > 0 ? (
-          <section key="education" className="resume-preview-section">
+          <section key="education" style={{ marginBottom: '16px' }}>
             {renderSectionTitle('教育背景')}
             {previewEducation.map((item, i) => (
-              <div key={i} className="resume-preview-item">
-                <div className="resume-preview-item-head">
+              <div key={i} style={{ marginBottom: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 500 }}>
                   <span>{[asText(item.school), asText(item.major), asText(item.degree)].filter(Boolean).join(' | ')}</span>
-                  <span className="resume-preview-muted">{formatDate(item.start_date)} ~ {formatDate(item.end_date)}</span>
+                  <span style={{ color: 'var(--text-muted)' }}>{formatDate(item.start_date)} ~ {formatDate(item.end_date)}</span>
                 </div>
                 {(hasText(item.gpa) || hasText(item.description)) && (
-                  <ul className="resume-preview-bullets">
+                  <ul style={{ margin: '6px 0 0 16px', padding: 0, fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.7' }}>
                     {hasText(item.gpa) && <li>GPA：{asText(item.gpa)}</li>}
                     {renderBulletLines(item.description).map((line, idx) => <li key={idx}>{line}</li>)}
                   </ul>
@@ -661,45 +826,50 @@ function PreviewModal({ profile, education, experience, projects, modules, photo
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="preview-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>简历预览</h3>
-          <button className="modal-close" onClick={onClose}>
-            <X size={20} />
-          </button>
+          <button className="btn btn-close" onClick={onClose}>×</button>
         </div>
-        <div className="preview-content">
+        <div className="modal-body-scroll">
           {!hasPreviewContent ? (
-            <div className="empty-state" style={{ minHeight: '320px' }}>
+            <div className="liquid-empty" style={{ minHeight: '320px' }}>
               <FileText size={32} />
               <p>暂无可预览内容</p>
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>先填写基本信息、教育背景、项目经历或自定义模块内容，再预览简历。</p>
+              <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>先填写基本信息、教育背景、项目经历或自定义模块内容，再预览简历。</p>
             </div>
           ) : (
-            <>
-              <div className="resume-preview-page">
-                <div className="resume-preview-header">
-                  <div>
-                    <h1>{asText(profile.full_name) || '简历预览'}</h1>
-                    <div className="resume-preview-contact-grid">
-                      {(hasText(profile.gender) || hasText(profile.age)) && <span>{asText(profile.gender) || ''}{hasText(profile.age) ? ' · ' + asText(profile.age) + '岁' : ''}</span>}
-                      {hasText(profile.phone) && <span>手机：{asText(profile.phone)}</span>}
-                      {hasText(profile.email) && <span>邮箱：{asText(profile.email)}</span>}
-                      {hasText(profile.wechat) && <span>微信：{asText(profile.wechat)}</span>}
-                      {hasText(profile.github) && <span>GitHub：{asText(profile.github)}</span>}
-                    </div>
+            <div style={{
+              background: '#fff',
+              borderRadius: '16px',
+              padding: '40px',
+              boxShadow: '0 4px 24px rgba(0,0,0,0.06)'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+                <div>
+                  <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '12px' }}>
+                    {asText(profile.full_name) || '简历预览'}
+                  </h1>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 16px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                    {(hasText(profile.gender) || hasText(profile.age)) && <span>{asText(profile.gender) || ''}{hasText(profile.age) ? ' · ' + asText(profile.age) + '岁' : ''}</span>}
+                    {hasText(profile.phone) && <span>手机：{asText(profile.phone)}</span>}
+                    {hasText(profile.email) && <span>邮箱：{asText(profile.email)}</span>}
+                    {hasText(profile.wechat) && <span>微信：{asText(profile.wechat)}</span>}
+                    {hasText(profile.github) && <span>GitHub：{asText(profile.github)}</span>}
                   </div>
-                  {photoSrc ? <img className="resume-preview-photo" src={photoSrc} alt="个人照片" /> : null}
                 </div>
-                {renderedSections}
+                {photoSrc ? <img style={{ width: '100px', height: '130px', objectFit: 'cover', borderRadius: '8px' }} src={photoSrc} alt="个人照片" /> : null}
               </div>
-            </>
+              {renderedSections}
+            </div>
           )}
         </div>
       </div>
     </div>
   )
 }
+
+/* ── 主组件 ── */
 
 export default function ResumeBuilder({ onToast }) {
   const [jobs, setJobs] = useState([])
@@ -749,7 +919,16 @@ export default function ResumeBuilder({ onToast }) {
     modules: false
   })
   const [validationErrors, setValidationErrors] = useState({})
+  const [aiModal, setAiModal] = useState({ open: false, section: '' })
   const basicPhotoSrc = resolvePhotoSrc(profile, photoPreview)
+
+  // AI生成相关状态
+  const [generatedResume, setGeneratedResume] = useState(null)
+  const [generationElapsed, setGenerationElapsed] = useState(0)
+  const [copied, setCopied] = useState(false)
+  const [targetJobInput, setTargetJobInput] = useState('')
+  const [targetCompany, setTargetCompany] = useState('')
+  const [targetRole, setTargetRole] = useState('')
 
   useEffect(() => {
     fetchJobs()
@@ -759,26 +938,18 @@ export default function ResumeBuilder({ onToast }) {
     fetchResumeFiles()
   }, [])
 
-  // Persist resumeFiles to localStorage
   useEffect(() => {
     localStorage.setItem('resumeFiles', JSON.stringify(resumeFiles))
   }, [resumeFiles])
 
-  const handleDeleteFile = async (file, index) => {
-    const displayName = file.fileName || file.name || file.path || '文件'
-    try {
-      await resumeAPI.deleteFile(file.path)
-      setResumeFiles(prev => prev.filter((_, i) => i !== index))
-      showToast(onToast, `已删除：${displayName}`, 'success')
-    } catch (error) {
-      if (String(error.message || '').includes('File not found')) {
-        setResumeFiles(prev => prev.filter((_, i) => i !== index))
-        showToast(onToast, `磁盘文件不存在，已从列表移除：${displayName}`, 'info')
-        return
-      }
-      showToast(onToast, `删除失败：${displayName}`, 'error')
+  useEffect(() => {
+    if (!isGenerating) {
+      setGenerationElapsed(0)
+      return
     }
-  }
+    const timer = setInterval(() => setGenerationElapsed(prev => prev + 1), 1000)
+    return () => clearInterval(timer)
+  }, [isGenerating])
 
   const fetchJobs = async () => {
     try {
@@ -808,15 +979,9 @@ export default function ResumeBuilder({ onToast }) {
       const res = await resumeAPI.getProfile()
       const data = res.data || {}
       setProfile(data)
-      if (data.education && Array.isArray(data.education)) {
-        setEducation(data.education)
-      }
-      if (data.experience && Array.isArray(data.experience)) {
-        setExperience(data.experience)
-      }
-      if (data.projects && Array.isArray(data.projects)) {
-        setProjects(data.projects)
-      }
+      if (data.education && Array.isArray(data.education)) setEducation(data.education)
+      if (data.experience && Array.isArray(data.experience)) setExperience(data.experience)
+      if (data.projects && Array.isArray(data.projects)) setProjects(data.projects)
     } catch (error) {
       showToast(onToast, '加载个人信息失败', 'error')
     }
@@ -848,11 +1013,8 @@ export default function ResumeBuilder({ onToast }) {
   const updateArrayField = (fieldName, index, key, value) => {
     const array = fieldName === 'education' ? education : fieldName === 'experience' ? experience : projects
     const setter = fieldName === 'education' ? setEducation : fieldName === 'experience' ? setExperience : setProjects
-    
     const newArray = [...array]
-    if (!newArray[index]) {
-      newArray[index] = {}
-    }
+    if (!newArray[index]) newArray[index] = {}
     newArray[index][key] = value
     setter(newArray)
     clearValidationError(`${fieldName}[${index}].${key}`)
@@ -869,27 +1031,22 @@ export default function ResumeBuilder({ onToast }) {
     setEducation(prev => [...prev, { school: '', degree: '', major: '', start_date: '', end_date: '', gpa: '', description: '' }])
     autoSaveData()
   }
-
   const deleteEducation = (index) => {
     setEducation(prev => prev.filter((_, i) => i !== index))
     autoSaveData()
   }
-
   const addExperience = () => {
     setExperience(prev => [...prev, { company: '', position: '', start_date: '', end_date: '', description: '', role: '' }])
     autoSaveData()
   }
-
   const deleteExperience = (index) => {
     setExperience(prev => prev.filter((_, i) => i !== index))
     autoSaveData()
   }
-
   const addProject = () => {
     setProjects(prev => [...prev, { name: '', role: '', start_date: '', end_date: '', description: '', responsibility: '', tech_stack: '' }])
     autoSaveData()
   }
-
   const deleteProject = (index) => {
     setProjects(prev => prev.filter((_, i) => i !== index))
     autoSaveData()
@@ -903,36 +1060,63 @@ export default function ResumeBuilder({ onToast }) {
     })
   }
 
-  const validateForm = () => {
-    const errors = {}
+  const openAiModal = (section) => {
+    setAiModal({ open: true, section })
+  }
 
-    if (profile.phone.trim() && !/^1[3-9]\d{9}$/.test(profile.phone.replace(/\s/g, ''))) {
-      errors['phone'] = '请输入有效的手机号码'
+  const closeAiModal = () => {
+    setAiModal({ open: false, section: '' })
+  }
+
+  const handleAiFillEducation = (items) => {
+    const newItems = items.map(item => ({
+      school: item.school || '',
+      major: item.major || '',
+      degree: item.degree || '',
+      gpa: item.gpa || '',
+      description: item.description || '',
+      start_date: item.start_date || '',
+      end_date: item.end_date || ''
+    }))
+    setEducation(prev => [...prev, ...newItems])
+    autoSaveData()
+  }
+
+  const handleAiFillExperience = (items) => {
+    const newItems = items.map(item => ({
+      company: item.company || '',
+      position: item.position || '',
+      start_date: item.start_date || '',
+      end_date: item.end_date || '',
+      description: item.description || '',
+      responsibility: item.responsibility || '',
+      role: item.role || ''
+    }))
+    setExperience(prev => [...prev, ...newItems])
+    autoSaveData()
+  }
+
+  const handleAiFillProjects = (items) => {
+    const newItems = items.map(item => ({
+      name: item.name || '',
+      role: item.role || '',
+      start_date: item.start_date || '',
+      end_date: item.end_date || '',
+      description: item.description || '',
+      tech_stack: item.tech_stack || '',
+      responsibility: item.responsibility || ''
+    }))
+    setProjects(prev => [...prev, ...newItems])
+    autoSaveData()
+  }
+
+  const handleAiFill = (section) => {
+    switch (section) {
+      case 'education': return handleAiFillEducation
+      case 'experience': return handleAiFillExperience
+      case 'projects': return handleAiFillProjects
+      default: return () => {}
     }
-    if (profile.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.email)) {
-      errors['email'] = '请输入有效的邮箱地址'
-    }
-
-    education.forEach((item, index) => {
-      if (!item.school.trim()) errors[`education[${index}].school`] = '请输入学校名称'
-      if (!item.major.trim()) errors[`education[${index}].major`] = '请输入专业名称'
-      if (!item.start_date) errors[`education[${index}].start_date`] = '请选择开始时间'
-    })
-
-    experience.forEach((item, index) => {
-      if (!item.company.trim()) errors[`experience[${index}].company`] = '请输入公司名称'
-      if (!item.position.trim()) errors[`experience[${index}].position`] = '请输入职位'
-      if (!item.start_date) errors[`experience[${index}].start_date`] = '请选择开始时间'
-      if (!item.description.trim()) errors[`experience[${index}].description`] = '请输入工作描述'
-    })
-
-    projects.forEach((item, index) => {
-      if (!item.start_date) errors[`projects[${index}].start_date`] = '请选择开始时间'
-      if (!item.responsibility.trim()) errors[`projects[${index}].responsibility`] = '请输入项目分工'
-    })
-
-    setValidationErrors(errors)
-    return Object.keys(errors).length === 0
   }
 
   const validateBasicInfo = () => {
@@ -988,16 +1172,10 @@ export default function ResumeBuilder({ onToast }) {
       setTimeout(() => setBasicSaveStatus('idle'), 2000)
       return
     }
-
     setIsSaving(true)
     setBasicSaveStatus('saving')
     try {
-      const data = {
-        ...profile,
-        education,
-        experience,
-        projects
-      }
+      const data = { ...profile, education, experience, projects }
       const res = await resumeAPI.saveProfile(data)
       setProfile(res.data)
       setPhotoPreview('')
@@ -1068,9 +1246,7 @@ export default function ResumeBuilder({ onToast }) {
     const mod = modules[index]
     if (!confirm(`确定要删除模块「${mod.name}」吗？`)) return
     try {
-      if (mod.type === 'custom') {
-        await resumeAPI.deleteModule(mod.id)
-      }
+      if (mod.type === 'custom') await resumeAPI.deleteModule(mod.id)
       const updated = modules.filter((_, i) => i !== index)
       saveModulesToServer(updated)
       showToast(onToast, `模块「${mod.name}」已删除`, 'success')
@@ -1085,12 +1261,7 @@ export default function ResumeBuilder({ onToast }) {
 
   const autoSaveData = useCallback(async () => {
     try {
-      const data = {
-        ...profile,
-        education,
-        experience,
-        projects
-      }
+      const data = { ...profile, education, experience, projects }
       await resumeAPI.saveProfile(data)
     } catch (error) {
       console.error('Auto save failed:', error)
@@ -1101,26 +1272,18 @@ export default function ResumeBuilder({ onToast }) {
     setIsSaving(true)
     setDataModuleSaveStatus(prev => ({ ...prev, [moduleId]: 'saving' }))
     try {
-      const payload = moduleId === 'education'
-        ? { education }
-        : moduleId === 'experience'
-          ? { experience }
-          : { projects }
+      const payload = moduleId === 'education' ? { education } : moduleId === 'experience' ? { experience } : { projects }
       const res = await resumeAPI.saveModuleData(moduleId, payload)
       setProfile(res.data)
       if (Array.isArray(res.data.education)) setEducation(res.data.education)
       if (Array.isArray(res.data.experience)) setExperience(res.data.experience)
       if (Array.isArray(res.data.projects)) setProjects(res.data.projects)
       setDataModuleSaveStatus(prev => ({ ...prev, [moduleId]: 'success' }))
-      setTimeout(() => {
-        setDataModuleSaveStatus(prev => ({ ...prev, [moduleId]: 'idle' }))
-      }, 2000)
+      setTimeout(() => setDataModuleSaveStatus(prev => ({ ...prev, [moduleId]: 'idle' })), 2000)
       showToast(onToast, '数据已保存', 'success')
     } catch (error) {
       setDataModuleSaveStatus(prev => ({ ...prev, [moduleId]: 'error' }))
-      setTimeout(() => {
-        setDataModuleSaveStatus(prev => ({ ...prev, [moduleId]: 'idle' }))
-      }, 2000)
+      setTimeout(() => setDataModuleSaveStatus(prev => ({ ...prev, [moduleId]: 'idle' })), 2000)
       showToast(onToast, `保存失败：${error.message}`, 'error')
     } finally {
       setIsSaving(false)
@@ -1131,13 +1294,15 @@ export default function ResumeBuilder({ onToast }) {
     setDragIndex(index)
     e.dataTransfer.effectAllowed = 'move'
   }
-
   const handleDragOver = (e, index) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
     setDragOverIndex(index)
   }
-
+  const handleDragEnd = () => {
+    setDragIndex(null)
+    setDragOverIndex(null)
+  }
   const handleDrop = (e, dropIndex) => {
     e.preventDefault()
     if (dragIndex === null || dragIndex === dropIndex) {
@@ -1170,6 +1335,80 @@ export default function ResumeBuilder({ onToast }) {
     }
   }
 
+  // AI生成简历
+  const generationHint = () => {
+    if (generationElapsed < 15) return '通常约 20-40 秒'
+    if (generationElapsed < 40) return '通常约 30-60 秒'
+    if (generationElapsed < 70) return '本次耗时偏长，通常在 1 分钟内完成'
+    return '已超过常见耗时，请继续等待，本次任务可能较复杂'
+  }
+
+  const handleGenerate = async () => {
+    if (!targetJobInput.trim() && !targetCompany.trim() && !targetRole.trim()) {
+      showToast(onToast, '请至少填写目标岗位信息（岗位ID、公司或岗位名称）', 'error')
+      return
+    }
+    setIsGenerating(true)
+    setGeneratedResume(null)
+    try {
+      const res = await resumeAPI.generate({
+        targetJobId: targetJobInput.trim() || undefined,
+        targetCompany: targetCompany.trim() || undefined,
+        targetRole: targetRole.trim() || undefined,
+        provider: selectedProvider
+      })
+      setGeneratedResume(res.data)
+      showToast(onToast, '简历生成成功！', 'success')
+    } catch (error) {
+      showToast(onToast, error?.response?.data?.error || error?.message || '生成失败，请检查 AI 配置', 'error')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  const handleDownload = (type) => {
+    if (!generatedResume) return
+    const content = type === 'md' ? generatedResume.markdown : generatedResume.plaintext
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `resume-${generatedResume.company || 'target'}-${generatedResume.role || 'role'}.${type}`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+    showToast(onToast, `已下载 ${type === 'md' ? 'Markdown' : '纯文本'} 版本`, 'success')
+  }
+
+  const handleCopy = async () => {
+    if (!generatedResume) return
+    try {
+      await navigator.clipboard.writeText(generatedResume.plaintext)
+      setCopied(true)
+      showToast(onToast, '已复制到剪贴板', 'success')
+      setTimeout(() => setCopied(false), 2000)
+    } catch (error) {
+      showToast(onToast, '复制失败', 'error')
+    }
+  }
+
+  const handleDeleteFile = async (file, index) => {
+    const displayName = file.fileName || file.name || file.path || '文件'
+    try {
+      await resumeAPI.deleteFile(file.path)
+      setResumeFiles(prev => prev.filter((_, i) => i !== index))
+      showToast(onToast, `已删除：${displayName}`, 'success')
+    } catch (error) {
+      if (String(error.message || '').includes('File not found')) {
+        setResumeFiles(prev => prev.filter((_, i) => i !== index))
+        showToast(onToast, `磁盘文件不存在，已从列表移除：${displayName}`, 'info')
+        return
+      }
+      showToast(onToast, `删除失败：${displayName}`, 'error')
+    }
+  }
+
   const toggleSection = (section) => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }))
   }
@@ -1180,438 +1419,450 @@ export default function ResumeBuilder({ onToast }) {
       return String(value || '').trim().length > 0
     }
     const hasBasic = Boolean(
-      hasText(data.full_name) ||
-      hasText(data.gender) ||
-      hasText(data.age) ||
-      hasText(data.phone) ||
-      hasText(data.email) ||
-      hasText(data.wechat) ||
-      hasText(data.github) ||
-      hasText(data.summary) ||
-      hasText(data.skills)
+      hasText(data.full_name) || hasText(data.gender) || hasText(data.age) ||
+      hasText(data.phone) || hasText(data.email) || hasText(data.wechat) ||
+      hasText(data.github) || hasText(data.summary) || hasText(data.skills)
     )
-    const hasEducation = (data.education || []).some(item => hasText(item.school) || hasText(item.major) || hasText(item.degree) || hasText(item.description) || hasText(item.start_date) || hasText(item.end_date))
-    const hasExperience = (data.experience || []).some(item => hasText(item.company) || hasText(item.position) || hasText(item.role) || hasText(item.description) || hasText(item.start_date) || hasText(item.end_date))
-    const hasProjects = (data.projects || []).some(item => hasText(item.name) || hasText(item.role) || hasText(item.tech_stack) || hasText(item.description) || hasText(item.start_date) || hasText(item.end_date))
+    const hasEducation = (data.education || []).some(item =>
+      hasText(item.school) || hasText(item.major) || hasText(item.degree) ||
+      hasText(item.description) || hasText(item.start_date) || hasText(item.end_date)
+    )
+    const hasExperience = (data.experience || []).some(item =>
+      hasText(item.company) || hasText(item.position) || hasText(item.role) ||
+      hasText(item.description) || hasText(item.start_date) || hasText(item.end_date)
+    )
+    const hasProjects = (data.projects || []).some(item =>
+      hasText(item.name) || hasText(item.role) || hasText(item.tech_stack) ||
+      hasText(item.description) || hasText(item.start_date) || hasText(item.end_date)
+    )
     const hasCustomModule = (data.modules || []).some(mod => mod.enabled && mod.type === 'custom' && hasText(mod.content))
     return hasBasic || hasEducation || hasExperience || hasProjects || hasCustomModule
   }
 
   return (
-    <>
-      <div className="page-header">
-        <h2>简历生成</h2>
-        <p>填写个人信息，根据岗位要求生成定制化简历</p>
-      </div>
+    <PageTransition>
+      <LiquidSectionHeader title="简历生成" subtitle="填写个人信息，根据岗位要求生成定制化简历" icon={FileText} />
 
-      <div className="card resume-card">
-        <SectionHeader
-          icon={User}
-          title="基本信息"
-          description="用于后续 PDF 简历生成"
-          onToggle={() => toggleSection('basic')}
-          isExpanded={expandedSections.basic}
-        />
-        
-        {expandedSections.basic && (
-          <div className="card-content">
-            <div className="resume-profile-grid">
-              <div>
-                <div className="form-grid-3" style={{ gridTemplateColumns: '1fr 100px 100px 1fr' }}>
-                  <FormInput
-                    label="姓名"
-                    name="full_name"
-                    value={profile.full_name}
-                    onChange={updateProfile}
-                    placeholder="请输入姓名"
-                    error={validationErrors.full_name}
-                  />
-                  <FormInput
-                    label="性别"
-                    name="gender"
-                    value={profile.gender}
-                    onChange={updateProfile}
-                    placeholder="男/女"
-                  />
-                  <FormInput
-                    label="年龄"
-                    name="age"
-                    value={profile.age}
-                    onChange={updateProfile}
-                    placeholder="22"
-                  />
-                  <FormInput
-                    label="GitHub"
-                    name="github"
-                    value={profile.github}
-                    onChange={updateProfile}
-                    placeholder="请输入 GitHub 用户名或链接"
-                  />
+      {/* ── 基本信息 ── */}
+      <ScrollReveal>
+        <LiquidCard>
+          <SectionHeader
+            icon={User}
+            title="基本信息"
+            description="用于后续 PDF 简历生成"
+            onToggle={() => toggleSection('basic')}
+            isExpanded={expandedSections.basic}
+          />
+          {expandedSections.basic && (
+            <div style={{ paddingTop: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: '24px' }}>
+                <div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '12px' }}>
+                    <FormInput label="姓名" name="full_name" value={profile.full_name} onChange={updateProfile} placeholder="请输入姓名" />
+                    <FormInput label="性别" name="gender" value={profile.gender} onChange={updateProfile} placeholder="男/女" />
+                    <FormInput label="年龄" name="age" value={profile.age} onChange={updateProfile} placeholder="22" />
+                    <FormInput label="GitHub" name="github" value={profile.github} onChange={updateProfile} placeholder="GitHub 用户名" />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                    <FormInput label="电话" name="phone" value={profile.phone} onChange={updateProfile} placeholder="手机号码" error={validationErrors.phone} />
+                    <FormInput label="邮箱" name="email" value={profile.email} onChange={updateProfile} placeholder="邮箱地址" error={validationErrors.email} />
+                    <FormInput label="微信" name="wechat" value={profile.wechat} onChange={updateProfile} placeholder="微信号" />
+                  </div>
                 </div>
-                <div className="form-grid-3">
-                  <FormInput
-                    label="电话"
-                    name="phone"
-                    value={profile.phone}
-                    onChange={updateProfile}
-                    placeholder="请输入手机号码"
-                    error={validationErrors.phone}
-                  />
-                  <FormInput
-                    label="邮箱"
-                    name="email"
-                    value={profile.email}
-                    onChange={updateProfile}
-                    placeholder="请输入邮箱地址"
-                    error={validationErrors.email}
-                  />
-                  <FormInput
-                    label="微信"
-                    name="wechat"
-                    value={profile.wechat}
-                    onChange={updateProfile}
-                    placeholder="请输入微信号"
-                  />
-                </div>
-              </div>
-              <div className="photo-section">
-                <div className="photo-preview">
-                  {basicPhotoSrc ? <img src={basicPhotoSrc} alt="个人照片" /> : <span>个人照片</span>}
-                </div>
-                <label className="btn btn-secondary btn-block">
-                  <Upload size={14} style={{ marginRight: '6px' }} />
-                  {basicPhotoSrc ? '更换照片' : '上传照片'}
-                  <input type="file" accept="image/png,image/jpeg" onChange={handlePhotoChange} style={{ display: 'none' }} />
-                </label>
-                {basicPhotoSrc && (
-                  <button className="btn btn-danger btn-block" style={{ marginTop: '8px' }} onClick={handleDeletePhoto} disabled={isSaving}>
-                    删除照片
-                  </button>
-                )}
-                <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--text-secondary)', textAlign: 'center' }}>
-                  支持 PNG/JPG，保存基本信息后会用于预览和简历导出
-                </div>
-              </div>
-            </div>
-            <FormTextarea
-              label="个人简介"
-              name="summary"
-              value={profile.summary}
-              onChange={updateProfile}
-              rows={4}
-              placeholder="请简要介绍自己的核心竞争力、专业技能和职业目标（建议100-200字）"
-            />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
-              <button
-                className={`btn btn-sm${basicSaveStatus === 'success' ? ' btn-success' : basicSaveStatus === 'error' ? ' btn-danger' : ' btn-primary'}`}
-                onClick={handleSaveProfile}
-                disabled={isSaving || basicSaveStatus === 'saving'}
-              >
-                {basicSaveStatus === 'success' ? (
-                  <>
-                    <CheckCircle size={14} style={{ marginRight: '4px' }} />
-                    已保存
-                  </>
-                ) : basicSaveStatus === 'error' ? (
-                  <>
-                    <X size={14} style={{ marginRight: '4px' }} />
-                    校验失败
-                  </>
-                ) : isSaving || basicSaveStatus === 'saving' ? (
-                  <>
-                    <Save size={14} style={{ marginRight: '4px' }} />
-                    保存中...
-                  </>
-                ) : (
-                  <>
-                    <Save size={14} style={{ marginRight: '4px' }} />
-                    保存基本信息
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="card resume-card">
-        <SectionHeader
-          icon={GripVertical}
-          title="简历模块管理"
-          description="拖拽排序模块顺序，控制简历输出结构。内置模块可显示/隐藏，自定义模块可编辑内容"
-          onToggle={() => toggleSection('modules')}
-          isExpanded={expandedSections.modules}
-          actions={
-            <>
-              {isSavingModules && <span className="sync-status">同步中...</span>}
-              <button className="btn btn-primary btn-sm" onClick={(e) => { e.stopPropagation(); setShowAddForm(true) }} disabled={showAddForm}>
-                <Plus size={14} style={{ marginRight: '4px' }} />
-                添加自定义模块
-              </button>
-            </>
-          }
-        />
-        
-        {expandedSections.modules && (
-          <div className="card-content modules-list">
-            {showAddForm && (
-              <AddModuleForm
-                onAdd={handleAddModule}
-                onCancel={() => setShowAddForm(false)}
-              />
-            )}
-            {modules.map((mod, index) => (
-              editIndex === index ? (
-                <EditModuleForm
-                  key={mod.id}
-                  module={mod}
-                  onSave={handleSaveEditModule}
-                  onCancel={() => setEditIndex(null)}
-                />
-              ) : (
-                <div key={mod.id} className="module-item-wrapper">
-                  <ModuleItem
-                    module={mod}
-                    index={index}
-                    onToggle={handleToggleModule}
-                    onEdit={handleEditModule}
-                    onDelete={handleDeleteModule}
-                    onEditData={handleEditData}
-                    onDragStart={handleDragStart}
-                    onDragOver={handleDragOver}
-                    onDrop={handleDrop}
-                    dragIndex={dragIndex}
-                    dragOverIndex={dragOverIndex}
-                  />
-                  {editingDataModule === mod.id && (
-                    <div className="builtin-data-editor">
-                      <div className="editor-header">
-                        <h4>
-                          {mod.id === 'education' && '教育背景'}
-                          {mod.id === 'experience' && '工作经历'}
-                          {mod.id === 'projects' && '项目经验'}
-                        </h4>
-                        <button className="btn-close" onClick={() => setEditingDataModule(null)}>
-                          <X size={18} />
-                        </button>
-                      </div>
-                      
-                      {mod.id === 'education' && (
-                        <div className="editor-content">
-                          {education.length === 0 ? (
-                            <div className="empty-state">
-                              <GraduationCap size={32} />
-                              <p>暂无教育背景信息</p>
-                            </div>
-                          ) : (
-                            education.map((item, idx) => (
-                              <EducationItem
-                                key={idx}
-                                item={item}
-                                index={idx}
-                                onChange={handleArrayChange}
-                                onDelete={deleteEducation}
-                              />
-                            ))
-                          )}
-                          <button className="btn btn-primary btn-sm" onClick={addEducation}>
-                            <Plus size={14} style={{ marginRight: '4px' }} />添加
-                          </button>
-                        </div>
-                      )}
-                      
-                      {mod.id === 'experience' && (
-                        <div className="editor-content">
-                          {experience.length === 0 ? (
-                            <div className="empty-state">
-                              <Briefcase size={32} />
-                              <p>暂无工作经历信息</p>
-                            </div>
-                          ) : (
-                            experience.map((item, idx) => (
-                              <ExperienceItem
-                                key={idx}
-                                item={item}
-                                index={idx}
-                                onChange={handleArrayChange}
-                                onDelete={deleteExperience}
-                              />
-                            ))
-                          )}
-                          <button className="btn btn-primary btn-sm" onClick={addExperience}>
-                            <Plus size={14} style={{ marginRight: '4px' }} />添加
-                          </button>
-                        </div>
-                      )}
-                      
-                      {mod.id === 'projects' && (
-                        <div className="editor-content">
-                          {projects.length === 0 ? (
-                            <div className="empty-state">
-                              <FolderOpen size={32} />
-                              <p>暂无项目经验信息</p>
-                            </div>
-                          ) : (
-                            projects.map((item, idx) => (
-                              <ProjectItem
-                                key={idx}
-                                item={item}
-                                index={idx}
-                                onChange={handleArrayChange}
-                                onDelete={deleteProject}
-                              />
-                            ))
-                          )}
-                          <button className="btn btn-primary btn-sm" onClick={addProject}>
-                            <Plus size={14} style={{ marginRight: '4px' }} />添加
-                          </button>
-                        </div>
-                      )}
-                      
-                      <div className="editor-footer">
-                        <button
-                          className="btn btn-primary"
-                          onClick={() => handleSaveDataModule(mod.id)}
-                          disabled={dataModuleSaveStatus[mod.id] === 'saving'}
-                        >
-                          {dataModuleSaveStatus[mod.id] === 'saving'
-                            ? '保存中...'
-                            : dataModuleSaveStatus[mod.id] === 'success'
-                              ? '✓ 已保存'
-                              : dataModuleSaveStatus[mod.id] === 'error'
-                                ? '✕ 保存失败'
-                                : '保存当前模块'}
-                        </button>
-                        <button className="btn btn-secondary" onClick={() => setEditingDataModule(null)}>
-                          关闭
-                        </button>
-                      </div>
-                    </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{
+                    width: '100px',
+                    height: '130px',
+                    borderRadius: '12px',
+                    background: 'var(--bg-secondary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 12px',
+                    overflow: 'hidden',
+                    border: '2px dashed var(--border-color)'
+                  }}>
+                    {basicPhotoSrc ? <img src={basicPhotoSrc} alt="个人照片" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>个人照片</span>}
+                  </div>
+                  <label className="btn btn-secondary btn-sm" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer' }}>
+                    <Upload size={14} />
+                    {basicPhotoSrc ? '更换照片' : '上传照片'}
+                    <input type="file" accept="image/png,image/jpeg" onChange={handlePhotoChange} style={{ display: 'none' }} />
+                  </label>
+                  {basicPhotoSrc && (
+                    <button className="btn btn-danger btn-sm" style={{ marginTop: '8px', width: '100%' }} onClick={handleDeletePhoto} disabled={isSaving}>
+                      删除照片
+                    </button>
                   )}
+                  <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>支持 PNG/JPG</div>
                 </div>
-              )
-            ))}
-            <p className="modules-hint">提示：拖拽模块卡片调整排序，简历将按此顺序输出各模块内容</p>
-          </div>
-        )}
-      </div>
-
-      <div className="card resume-card">
-        <SectionHeader
-          icon={FileText}
-          title="生成简历"
-          description="选择岗位并生成定制化简历"
-        />
-        
-        <div className="card-content">
-          <div className="form-item">
-            <label>选择岗位 <span className="required">*</span></label>
-            <select value={selectedJob} onChange={(e) => setSelectedJob(e.target.value)} className="form-input">
-              <option value="">请选择岗位</option>
-              {jobs.map((job) => (
-                <option key={job.id} value={job.id}>
-                  {job.company} - {job.title}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="form-item">
-            <label>AI 生成模型</label>
-            <select value={selectedProvider} onChange={(e) => setSelectedProvider(e.target.value)} className="form-input">
-              {providers.length === 0 && <option value="deepseek">DeepSeek</option>}
-              {providers.map(provider => (
-                <option key={provider.id} value={provider.id} disabled={!provider.configured}>
-                  {provider.label} {provider.configured ? `(${provider.model})` : '(未配置 Key)'}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="action-buttons">
-            <button className="btn btn-primary btn-large" onClick={handleSaveProfile} disabled={isSaving}>
-              <Save size={20} className="btn-icon" />
-              <div className="btn-text">
-                <span className="btn-label">保存信息</span>
-                <span className="btn-desc">保存所有填写的个人信息</span>
               </div>
-            </button>
-            <button className="btn btn-secondary btn-large" onClick={async () => {
-              const data = {
-                ...profile,
-                education,
-                experience,
-                projects,
-                modules
-              }
-              if (!hasPreviewableContent(data)) {
-                showToast(onToast, '暂无可预览内容，请先填写至少一项简历信息', 'info')
-                return
-              }
-              setShowPreview(true)
-            }}>
-              <Eye size={20} className="btn-icon" />
-              <div className="btn-text">
-                <span className="btn-label">预览简历</span>
-                <span className="btn-desc">查看简历效果预览</span>
+              <FormTextarea
+                label="个人简介"
+                name="summary"
+                value={profile.summary}
+                onChange={updateProfile}
+                rows={4}
+                placeholder="请简要介绍自己的核心竞争力、专业技能和职业目标（建议100-200字）"
+              />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '12px' }}>
+                <MagneticButton
+                  variant={basicSaveStatus === 'success' ? 'success' : basicSaveStatus === 'error' ? 'danger' : 'primary'}
+                  className="btn-sm"
+                  onClick={handleSaveProfile}
+                  disabled={isSaving || basicSaveStatus === 'saving'}
+                >
+                  {basicSaveStatus === 'success' ? <><CheckCircle size={14} style={{ marginRight: '4px' }} />已保存</>
+                    : basicSaveStatus === 'error' ? <><X size={14} style={{ marginRight: '4px' }} />校验失败</>
+                      : isSaving || basicSaveStatus === 'saving' ? <><FloppyDisk size={14} style={{ marginRight: '4px' }} />保存中...</>
+                        : <><FloppyDisk size={14} style={{ marginRight: '4px' }} />保存基本信息</>}
+                </MagneticButton>
               </div>
-            </button>
-            <button className="btn btn-warning btn-large" onClick={handleGeneratePdf} disabled={!selectedJob || isGenerating}>
-              <FileImage size={20} className="btn-icon" />
-              <div className="btn-text">
-                <span className="btn-label">生成 PDF</span>
-                <span className="btn-desc">生成可打印的 PDF 文件</span>
-              </div>
-            </button>
-          </div>
-
-          {isGenerating && (
-            <div className="empty-state">
-              <div className="spinner" style={{ margin: '0 auto' }}></div>
-              <p>正在生成简历...</p>
             </div>
           )}
+        </LiquidCard>
+      </ScrollReveal>
 
-          {!isGenerating && jobs.length === 0 && (
-            <div className="empty-state">
-              <FileText size={64} />
-              <p>暂无可生成简历的岗位，请先在岗位发现中导入或扫描岗位</p>
+      {/* ── 简历模块管理 ── */}
+      <ScrollReveal delay={0.1}>
+        <LiquidCard>
+          <SectionHeader
+            icon={DotsSixVertical}
+            title="简历模块管理"
+            description="拖拽排序模块顺序，控制简历输出结构"
+            onToggle={() => toggleSection('modules')}
+            isExpanded={expandedSections.modules}
+            actions={
+              <>
+                {isSavingModules && <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>同步中...</span>}
+                <MagneticButton variant="primary" className="btn-sm" onClick={(e) => { e.stopPropagation(); setShowAddForm(true) }} disabled={showAddForm}>
+                  <Plus size={14} style={{ marginRight: '4px' }} />添加自定义模块
+                </MagneticButton>
+              </>
+            }
+          />
+          {expandedSections.modules && (
+            <div style={{ paddingTop: '16px' }}>
+              {showAddForm && <AddModuleForm onAdd={handleAddModule} onCancel={() => setShowAddForm(false)} />}
+              {modules.map((mod, index) => (
+                editIndex === index ? (
+                  <EditModuleForm key={mod.id} module={mod} onSave={handleSaveEditModule} onCancel={() => setEditIndex(null)} />
+                ) : (
+                  <div key={mod.id}>
+                    <ModuleItem
+                      module={mod}
+                      index={index}
+                      onToggle={handleToggleModule}
+                      onEdit={handleEditModule}
+                      onDelete={handleDeleteModule}
+                      onEditData={handleEditData}
+                      onDragStart={handleDragStart}
+                      onDragOver={handleDragOver}
+                      onDrop={handleDrop}
+                      onDragEnd={handleDragEnd}
+                      dragIndex={dragIndex}
+                      dragOverIndex={dragOverIndex}
+                    />
+                    {editingDataModule === mod.id && (
+                      <div style={{
+                        background: 'var(--bg-secondary)',
+                        borderRadius: '16px',
+                        padding: '20px',
+                        marginBottom: '16px',
+                        border: '1px solid var(--border-color)'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                          <h4 style={{ fontSize: '16px' }}>
+                            {mod.id === 'education' && '教育背景'}
+                            {mod.id === 'experience' && '工作经历'}
+                            {mod.id === 'projects' && '项目经验'}
+                          </h4>
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <button className="btn btn-sm btn-secondary" onClick={() => openAiModal(mod.id)} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <Sparkle size={14} /> AI 补全
+                            </button>
+                            <button className="btn btn-sm btn-secondary" onClick={() => setEditingDataModule(null)} style={{ padding: '6px' }}>
+                              <X size={18} />
+                            </button>
+                          </div>
+                        </div>
+                        {mod.id === 'education' && (
+                          <>
+                            {education.length === 0 ? (
+                              <div className="liquid-empty">
+                                <GraduationCap size={32} />
+                                <p>暂无教育背景信息</p>
+                              </div>
+                            ) : education.map((item, idx) => (
+                              <EducationItem key={idx} item={item} index={idx} onChange={handleArrayChange} onDelete={deleteEducation} />
+                            ))}
+                            <MagneticButton variant="primary" className="btn-sm" onClick={addEducation}>
+                              <Plus size={14} style={{ marginRight: '4px' }} />添加
+                            </MagneticButton>
+                          </>
+                        )}
+                        {mod.id === 'experience' && (
+                          <>
+                            {experience.length === 0 ? (
+                              <div className="liquid-empty">
+                                <Briefcase size={32} />
+                                <p>暂无工作经历信息</p>
+                              </div>
+                            ) : experience.map((item, idx) => (
+                              <ExperienceItem key={idx} item={item} index={idx} onChange={handleArrayChange} onDelete={deleteExperience} />
+                            ))}
+                            <MagneticButton variant="primary" className="btn-sm" onClick={addExperience}>
+                              <Plus size={14} style={{ marginRight: '4px' }} />添加
+                            </MagneticButton>
+                          </>
+                        )}
+                        {mod.id === 'projects' && (
+                          <>
+                            {projects.length === 0 ? (
+                              <div className="liquid-empty">
+                                <FolderOpen size={32} />
+                                <p>暂无项目经验信息</p>
+                              </div>
+                            ) : projects.map((item, idx) => (
+                              <ProjectItem key={idx} item={item} index={idx} onChange={handleArrayChange} onDelete={deleteProject} />
+                            ))}
+                            <MagneticButton variant="primary" className="btn-sm" onClick={addProject}>
+                              <Plus size={14} style={{ marginRight: '4px' }} />添加
+                            </MagneticButton>
+                          </>
+                        )}
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
+                          <MagneticButton
+                            variant="primary"
+                            onClick={() => handleSaveDataModule(mod.id)}
+                            disabled={dataModuleSaveStatus[mod.id] === 'saving'}
+                          >
+                            {dataModuleSaveStatus[mod.id] === 'saving' ? '保存中...'
+                              : dataModuleSaveStatus[mod.id] === 'success' ? '✓ 已保存'
+                                : dataModuleSaveStatus[mod.id] === 'error' ? '✕ 保存失败'
+                                  : '保存当前模块'}
+                          </MagneticButton>
+                          <MagneticButton variant="secondary" onClick={() => setEditingDataModule(null)}>关闭</MagneticButton>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              ))}
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '12px' }}>提示：拖拽模块卡片调整排序，简历将按此顺序输出各模块内容</p>
             </div>
           )}
-        </div>
-      </div>
+        </LiquidCard>
+      </ScrollReveal>
 
+      {/* ── 生成简历 ── */}
+      <ScrollReveal delay={0.2}>
+        <LiquidCard>
+          <SectionHeader
+            icon={FileText}
+            title="生成简历"
+            description="选择岗位并生成定制化简历"
+          />
+          <div style={{ paddingTop: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+              <div className="form-item">
+                <label style={{ fontSize: '13px', fontWeight: 500 }}>选择岗位 <span style={{ color: 'var(--danger-color)' }}>*</span></label>
+                <select value={selectedJob} onChange={(e) => setSelectedJob(e.target.value)} className="form-control">
+                  <option value="">请选择岗位</option>
+                  {jobs.map((job) => (
+                    <option key={job.id} value={job.id}>{job.company} - {job.title}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-item">
+                <label style={{ fontSize: '13px', fontWeight: 500 }}>AI 生成模型</label>
+                <select value={selectedProvider} onChange={(e) => setSelectedProvider(e.target.value)} className="form-control">
+                  {providers.length === 0 && <option value="deepseek">DeepSeek</option>}
+                  {providers.map(provider => (
+                    <option key={provider.id} value={provider.id} disabled={!provider.configured}>
+                      {provider.label} {provider.configured ? `(${provider.model})` : '(未配置 Key)'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px' }}>
+              <MagneticButton variant="primary" onClick={handleSaveProfile} disabled={isSaving}>
+                <FloppyDisk size={18} style={{ marginRight: '6px' }} />
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: 600 }}>保存信息</div>
+                  <div style={{ fontSize: '11px', opacity: 0.8 }}>保存所有填写的个人信息</div>
+                </div>
+              </MagneticButton>
+              <MagneticButton variant="secondary" onClick={() => {
+                const data = { ...profile, education, experience, projects, modules }
+                if (!hasPreviewableContent(data)) {
+                  showToast(onToast, '暂无可预览内容，请先填写至少一项简历信息', 'info')
+                  return
+                }
+                setShowPreview(true)
+              }}>
+                <Eye size={18} style={{ marginRight: '6px' }} />
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: 600 }}>预览简历</div>
+                  <div style={{ fontSize: '11px', opacity: 0.8 }}>查看简历效果预览</div>
+                </div>
+              </MagneticButton>
+              <MagneticButton variant="warning" onClick={handleGeneratePdf} disabled={!selectedJob || isGenerating}>
+                <FileImage size={18} style={{ marginRight: '6px' }} />
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: 600 }}>生成 PDF</div>
+                  <div style={{ fontSize: '11px', opacity: 0.8 }}>生成可打印的 PDF 文件</div>
+                </div>
+              </MagneticButton>
+            </div>
+
+            {isGenerating && (
+              <div className="liquid-empty">
+                <div className="liquid-spinner" style={{ margin: '0 auto' }}></div>
+                <p>正在生成简历...</p>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>已耗时 {generationElapsed} 秒 · {generationHint()}</p>
+              </div>
+            )}
+
+            {!isGenerating && jobs.length === 0 && (
+              <div className="liquid-empty">
+                <FileText size={64} />
+                <p>暂无可生成简历的岗位，请先在岗位发现中导入或扫描岗位</p>
+              </div>
+            )}
+          </div>
+        </LiquidCard>
+      </ScrollReveal>
+
+      {/* ── AI 生成简历 ── */}
+      <ScrollReveal delay={0.3}>
+        <LiquidCard>
+          <SectionHeader
+            icon={FileText}
+            title="AI 生成个性化简历"
+            description="基于简历事实库生成个性化简历"
+          />
+          <div style={{ paddingTop: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+              <div className="form-item">
+                <label style={{ fontSize: '13px', fontWeight: 500 }}>目标岗位 ID（可选）</label>
+                <input className="form-control" value={targetJobInput} onChange={(e) => setTargetJobInput(e.target.value)} placeholder="输入岗位 ID" />
+              </div>
+              <div className="form-item">
+                <label style={{ fontSize: '13px', fontWeight: 500 }}>目标公司（可选）</label>
+                <input className="form-control" value={targetCompany} onChange={(e) => setTargetCompany(e.target.value)} placeholder="输入公司名称" />
+              </div>
+              <div className="form-item">
+                <label style={{ fontSize: '13px', fontWeight: 500 }}>目标岗位名称（可选）</label>
+                <input className="form-control" value={targetRole} onChange={(e) => setTargetRole(e.target.value)} placeholder="输入岗位名称" />
+              </div>
+            </div>
+            <MagneticButton
+              variant="primary"
+              onClick={handleGenerate}
+              disabled={isGenerating || (!targetJobInput.trim() && !targetCompany.trim() && !targetRole.trim())}
+            >
+              <FileText size={18} style={{ marginRight: '6px' }} />
+              {isGenerating ? '生成中...' : 'AI 生成简历'}
+            </MagneticButton>
+          </div>
+
+          {generatedResume && (
+            <div style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                <div>
+                  <div style={{ fontSize: '16px', fontWeight: 600 }}>生成的简历</div>
+                  <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                    {generatedResume.company && `${generatedResume.company} - `}
+                    {generatedResume.role}
+                    {generatedResume.provider_label && ` · 由 ${generatedResume.provider_label} 生成`}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <MagneticButton variant="secondary" className="btn-sm" onClick={() => handleDownload('md')}>
+                    <Download size={14} style={{ marginRight: '4px' }} />Markdown
+                  </MagneticButton>
+                  <MagneticButton variant="secondary" className="btn-sm" onClick={() => handleDownload('txt')}>
+                    <Download size={14} style={{ marginRight: '4px' }} />纯文本
+                  </MagneticButton>
+                  <MagneticButton variant="primary" className="btn-sm" onClick={handleCopy}>
+                    {copied ? <><CheckCircle size={14} style={{ marginRight: '4px' }} />已复制</>
+                      : <><CopySimple size={14} style={{ marginRight: '4px' }} />复制</>}
+                  </MagneticButton>
+                </div>
+              </div>
+              <pre style={{
+                background: 'var(--bg-secondary)',
+                borderRadius: '12px',
+                padding: '16px',
+                fontSize: '13px',
+                lineHeight: '1.7',
+                overflow: 'auto',
+                maxHeight: '400px'
+              }}>
+                {generatedResume.markdown}
+              </pre>
+            </div>
+          )}
+        </LiquidCard>
+      </ScrollReveal>
+
+      {/* ── 生成文件 ── */}
       {resumeFiles.length > 0 && (
-        <div className="card">
+        <ScrollReveal delay={0.4}>
+          <LiquidCard>
+            <div className="card-header">
+              <div className="card-title">生成文件</div>
+            </div>
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+              {resumeFiles.map((file, index) => (
+                <li key={`${file.path}-${index}`} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '8px',
+                  padding: '10px 0',
+                  borderBottom: '1px solid var(--border-color)'
+                }}>
+                  <a href={`/${file.path}`} target="_blank" rel="noreferrer" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--primary-color)' }}>
+                    {file.fileName || file.name || file.path}
+                  </a>
+                  <button onClick={() => handleDeleteFile(file, index)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger-color)', padding: '4px', borderRadius: '4px', display: 'flex', alignItems: 'center' }} title="删除文件">
+                    <Trash size={16} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </LiquidCard>
+        </ScrollReveal>
+      )}
+
+      {/* ── 使用说明 ── */}
+      <ScrollReveal delay={0.5}>
+        <LiquidCard>
           <div className="card-header">
-            <div className="card-title">生成文件</div>
+            <div className="card-title">使用说明</div>
           </div>
-          <ul className="file-list">
-            {resumeFiles.map((file, index) => (
-              <li key={`${file.path}-${index}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                <a href={`/${file.path}`} target="_blank" rel="noreferrer" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.fileName || file.name || file.path}</a>
-                <button onClick={() => handleDeleteFile(file, index)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger-color)', padding: '4px', borderRadius: '4px', display: 'flex', alignItems: 'center' }} title="删除文件">
-                  <Trash2 size={16} />
-                </button>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+            {[
+              '在各信息模块中填写详细的个人信息，系统会自动保存到简历模板',
+              '教育背景、工作经历、项目经验支持添加多条记录，按时间顺序排列',
+              '在「简历模块管理」中拖拽排序、显示/隐藏模块，控制简历输出结构',
+              '点击「预览简历」查看填写效果，确认无误后再生成正式简历',
+              '选择一个已评估的岗位，系统会根据岗位要求定制简历内容'
+            ].map((text, i) => (
+              <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '8px 0', fontSize: '14px', color: 'var(--text-secondary)' }}>
+                <CheckCircle size={18} style={{ color: 'var(--success-color)', flexShrink: 0, marginTop: '2px' }} />
+                {text}
               </li>
             ))}
           </ul>
-        </div>
-      )}
+        </LiquidCard>
+      </ScrollReveal>
 
-      <div className="card">
-        <div className="card-header">
-          <div className="card-title">使用说明</div>
-        </div>
-        <ul className="guide-list">
-          <li><CheckCircle size={18} className="check-icon" />在各信息模块中填写详细的个人信息，系统会自动保存到简历模板</li>
-          <li><CheckCircle size={18} className="check-icon" />教育背景、工作经历、项目经验支持添加多条记录，按时间顺序排列</li>
-          <li><CheckCircle size={18} className="check-icon" />在「简历模块管理」中拖拽排序、显示/隐藏模块，控制简历输出结构</li>
-          <li><CheckCircle size={18} className="check-icon" />点击「预览简历」查看填写效果，确认无误后再生成正式简历</li>
-          <li><CheckCircle size={18} className="check-icon" />选择一个已评估的岗位，系统会根据岗位要求定制简历内容</li>
-        </ul>
-      </div>
-
+      {/* ── 预览模态框 ── */}
       {showPreview && (
         <PreviewModal
           profile={profile}
@@ -1623,6 +1874,15 @@ export default function ResumeBuilder({ onToast }) {
           onClose={() => setShowPreview(false)}
         />
       )}
-    </>
+
+      {/* ── AI 智能补全模态框 ── */}
+      <AiAutoFillModal
+        isOpen={aiModal.open}
+        onClose={closeAiModal}
+        section={aiModal.section}
+        onFill={handleAiFill(aiModal.section)}
+        onToast={onToast}
+      />
+    </PageTransition>
   )
 }

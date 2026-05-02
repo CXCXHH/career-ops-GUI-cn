@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense, lazy } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import Toast from './components/Toast'
@@ -13,6 +13,10 @@ import Followups from './pages/Followups'
 import Candidates from './pages/Candidates'
 import Settings from './pages/Settings'
 import Onboarding from './pages/Onboarding'
+import './styles/liquid-hero.css'
+
+// Lazy load LiquidMetalHero to avoid SSR issues with Paper.js
+const LiquidMetalHero = lazy(() => import('./components/LiquidMetalHero'))
 
 export default function App() {
   const location = useLocation()
@@ -35,10 +39,17 @@ export default function App() {
     return <div>Loading...</div>
   }
 
+  const isHomePage = location.pathname === '/'
+
   return (
     <>
       <Sidebar />
       <main className="main-content">
+        {isHomePage && (
+          <Suspense fallback={<div style={{ minHeight: '100dvh' }} />}>
+            <LiquidMetalHero />
+          </Suspense>
+        )}
         <Routes>
           <Route path="/" element={<Dashboard onToast={showToast} />} />
           <Route path="/companies" element={<Companies onToast={showToast} />} />

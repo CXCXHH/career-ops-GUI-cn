@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Settings as SettingsIcon, Activity, CheckCircle, AlertCircle, Clock, Terminal } from 'lucide-react'
+import { Gear, Pulse, CheckCircle, WarningCircle, Clock, Terminal } from '@phosphor-icons/react'
 import { aiAPI, healthAPI } from '../api'
 import { showToast } from '../utils/toast'
+import { PageTransition, LiquidSectionHeader, LiquidCard, MagneticButton } from '../components/LiquidMotion'
+import '../styles/liquid-motion.css'
 
 export default function Settings({ onToast }) {
   const [healthStatus, setHealthStatus] = useState(null)
@@ -161,26 +163,23 @@ export default function Settings({ onToast }) {
   const getStatusIcon = (status) => {
     switch (status) {
       case 'pass': return <CheckCircle style={{ color: 'var(--success-color)', width: '20px', height: '20px' }} />
-      case 'warn': return <AlertCircle style={{ color: 'var(--warning-color)', width: '20px', height: '20px' }} />
-      case 'fail': return <AlertCircle style={{ color: 'var(--danger-color)', width: '20px', height: '20px' }} />
-      default: return <Activity style={{ color: 'var(--text-secondary)', width: '20px', height: '20px' }} />
+      case 'warn': return <WarningCircle style={{ color: 'var(--warning-color)', width: '20px', height: '20px' }} />
+      case 'fail': return <WarningCircle style={{ color: 'var(--danger-color)', width: '20px', height: '20px' }} />
+      default: return <Pulse style={{ color: 'var(--text-secondary)', width: '20px', height: '20px' }} />
     }
   }
 
   return (
-    <>
-      <div className="page-header">
-        <h2>设置</h2>
-        <p>系统健康检查和配置</p>
-      </div>
+    <PageTransition>
+      <LiquidSectionHeader title="设置" subtitle="系统健康检查和配置" icon={Gear} />
 
-      <div className="card">
+      <LiquidCard delay={0}>
         <div className="card-header">
           <div className="card-title">系统健康状态</div>
-          <button className="btn btn-primary btn-sm" onClick={runDoctor} disabled={isRunning}>
-            <Activity style={{ width: '14px', height: '14px', marginRight: '6px' }} />
+          <MagneticButton variant="primary" className="btn-sm" onClick={runDoctor} disabled={isRunning}>
+            <Pulse style={{ width: '14px', height: '14px', marginRight: '6px' }} />
             运行检查并安装依赖
-          </button>
+          </MagneticButton>
         </div>
         {healthStatus && (
           <table className="table">
@@ -193,7 +192,7 @@ export default function Settings({ onToast }) {
             </thead>
             <tbody>
               {Object.entries(healthStatus).map(([key, value]) => (
-                <tr key={key}>
+                <tr key={key} className="liquid-table-row">
                   <td>{key}</td>
                   <td>{getStatusIcon(value.status)}</td>
                   <td>{value.message}</td>
@@ -202,9 +201,9 @@ export default function Settings({ onToast }) {
             </tbody>
           </table>
         )}
-      </div>
+      </LiquidCard>
 
-      <div className="card">
+      <LiquidCard delay={0.08}>
         <div className="card-header">
           <div>
             <div className="card-title">AI API 评分配置</div>
@@ -212,10 +211,10 @@ export default function Settings({ onToast }) {
               API Key 会保存到本机项目 .env 文件。留空 Key 时只更新模型和地址，不会清空已有 Key；如需删除，请使用清除按钮。
             </p>
           </div>
-          <button className="btn btn-primary btn-sm" onClick={saveAiSettings} disabled={isSavingAi}>
-            <SettingsIcon style={{ width: '14px', height: '14px', marginRight: '6px' }} />
+          <MagneticButton variant="primary" className="btn-sm" onClick={saveAiSettings} disabled={isSavingAi}>
+            <Gear style={{ width: '14px', height: '14px', marginRight: '6px' }} />
             {isSavingAi ? '保存中...' : '保存 AI 配置'}
-          </button>
+          </MagneticButton>
         </div>
 
         <div className="provider-grid">
@@ -226,14 +225,14 @@ export default function Settings({ onToast }) {
                 <span className={`status-badge ${aiSettings?.deepseek?.configured ? 'status-active' : 'status-unconfirmed'}`}>
                   {aiSettings?.deepseek?.configured ? `已配置 ${aiSettings.deepseek.apiKeyMasked}` : '未配置'}
                 </span>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
+                <MagneticButton
+                  variant="secondary"
+                  className="btn-sm"
                   onClick={() => clearAiSettings('deepseek')}
                   disabled={!aiSettings?.deepseek?.configured || clearingProvider === 'deepseek' || isSavingAi}
                 >
                   {clearingProvider === 'deepseek' ? '清除中...' : '清除'}
-                </button>
+                </MagneticButton>
               </div>
             </div>
             <div className="form-group">
@@ -272,14 +271,14 @@ export default function Settings({ onToast }) {
                 <span className={`status-badge ${aiSettings?.doubao?.configured ? 'status-active' : 'status-unconfirmed'}`}>
                   {aiSettings?.doubao?.configured ? `已配置 ${aiSettings.doubao.apiKeyMasked}` : '未配置'}
                 </span>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
+                <MagneticButton
+                  variant="secondary"
+                  className="btn-sm"
                   onClick={() => clearAiSettings('doubao')}
                   disabled={!aiSettings?.doubao?.configured || clearingProvider === 'doubao' || isSavingAi}
                 >
                   {clearingProvider === 'doubao' ? '清除中...' : '清除'}
-                </button>
+                </MagneticButton>
               </div>
             </div>
             <div className="form-group">
@@ -311,32 +310,32 @@ export default function Settings({ onToast }) {
             </div>
           </div>
         </div>
-      </div>
+      </LiquidCard>
 
-      <div className="card">
+      <LiquidCard delay={0.16}>
         <div className="card-header">
           <div className="card-title">工具命令</div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', padding: '0 24px 24px' }}>
-          <button className="btn btn-secondary" onClick={runVerify} disabled={isRunning}>
+          <MagneticButton variant="secondary" className="btn-sm" onClick={runVerify} disabled={isRunning}>
             <Terminal style={{ width: '14px', height: '14px', marginRight: '8px' }} />
             验证配置
-          </button>
-          <button className="btn btn-secondary" onClick={runSync} disabled={isRunning}>
+          </MagneticButton>
+          <MagneticButton variant="secondary" className="btn-sm" onClick={runSync} disabled={isRunning}>
             <Clock style={{ width: '14px', height: '14px', marginRight: '8px' }} />
             同步检查
-          </button>
+          </MagneticButton>
         </div>
-      </div>
+      </LiquidCard>
 
       {commandOutput && (
-        <div className="card">
+        <LiquidCard delay={0.24}>
           <div className="card-header">
             <div className="card-title">命令输出</div>
           </div>
           <pre className="command-output">{commandOutput}</pre>
-        </div>
+        </LiquidCard>
       )}
-    </>
+    </PageTransition>
   )
 }

@@ -1,44 +1,63 @@
 /*
  * Career-Ops-GUI-cn 设计变量
- * 修改此文件即可全局调整配色、字体、阴影
- * 变量分类见 design.md
+ * 温和衬线体 + 雾霾蓝 + 大圆角大间距设计
  */
 
 :root {
   /* ── 主色 ── */
-  --primary-color: #6b1d1d;
-  --primary-hover: #7a2525;
-  --primary-tint: #faf5f5;
+  --primary-color: #5D87FF;
+  --primary-hover: #4A73E8;
+  --primary-light: #EDF2FF;
+  --primary-tint: #F0F5FF;
+
+  /* ── 雾霾蓝色系 ── */
+  --haze-blue-50: #f0f4f8;
+  --haze-blue-100: #d9e2ec;
+  --haze-blue-200: #bcccdc;
+  --haze-blue-300: #9fb3c8;
+  --haze-blue-400: #829ab1;
+  --haze-blue-500: #627d98;
+  --haze-blue-600: #486581;
+  --haze-blue-700: #334e68;
+  --haze-blue-800: #243b53;
+  --haze-blue-900: #102a43;
 
   /* ── 状态色 ── */
-  --success-color: #15803d;
-  --success-tint: #ecfdf5;
-  --warning-color: #b45309;
-  --warning-tint: #fef7ed;
-  --danger-color: #b91c1c;
-  --danger-tint: #fef2f2;
-  --info-color: #0e7490;
+  --success-color: #52C41A;
+  --success-tint: #F6FFED;
+  --warning-color: #FAAD14;
+  --warning-tint: #FFFBE6;
+  --danger-color: #FF4D4F;
+  --danger-tint: #FFF2F0;
+  --info-color: #1890FF;
 
   /* ── 装饰 ── */
-  --accent-gold: #b8a88a;
+  --accent-gold: #5D87FF;
 
   /* ── 背景 ── */
-  --bg-primary: #faf9f7;
-  --bg-secondary: #f5f3ef;
-  --bg-sidebar: #1c1917;
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F5F7FA;
+  --bg-sidebar: #FFFFFF;
+  --bg-hover: rgba(93, 135, 255, 0.06);
+  --bg-active: rgba(93, 135, 255, 0.1);
 
   /* ── 文字 ── */
-  --text-primary: #292524;
-  --text-secondary: #78716c;
-  --text-muted: #a8a29e;
-  --text-disabled: #d6d3d1;
+  --text-primary: #1F2937;
+  --text-secondary: #6B7280;
+  --text-muted: #9CA3AF;
+  --text-disabled: #D1D5DB;
 
   /* ── 边框 ── */
-  --border-color: #e7e5e4;
-  --border-light: #d6d3d1;
+  --border-color: #E5E7EB;
+  --border-light: #F3F4F6;
 
-  /* ── 阴影（暖色调） ── */
-  --shadow-sm: 0 1px 2px rgba(41, 37, 36, 0.06);
-  --shadow-md: 0 4px 6px -1px rgba(41, 37, 36, 0.08);
-  --shadow-lg: 0 10px 15px -3px rgba(41, 37, 36, 0.1);
+  /* ── 阴影（现代柔和） ── */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.08);
+  --shadow-xl: 0 20px 48px rgba(0, 0, 0, 0.1);
+
+  /* ── 字体 ── */
+  --font-serif: 'Noto Serif SC', 'Songti SC', 'STSong', 'SimSun', serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }

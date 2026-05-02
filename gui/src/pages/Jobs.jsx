@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { FileText, RefreshCw, Trash2, Eye, ExternalLink, CheckCircle, AlertTriangle, Search, CheckSquare, Square, Loader2, Plus } from 'lucide-react'
+import { FileText, ArrowsClockwise, Trash, Eye, ArrowSquareOut, CheckCircle, Warning, MagnifyingGlass, CheckSquare, Square, Spinner, Plus } from '@phosphor-icons/react'
 import { aiAPI, jobsAPI } from '../api'
 import { showToast } from '../utils/toast'
+import { PageTransition, LiquidSectionHeader, LiquidCard, MagneticButton } from '../components/LiquidMotion'
+import '../styles/liquid-motion.css'
 
 export default function Jobs({ onToast }) {
   const [jobs, setJobs] = useState([])
@@ -309,23 +311,20 @@ export default function Jobs({ onToast }) {
 
   if (isLoading) {
     return (
-      <div className="page-header">
-        <h2>岗位列表</h2>
-        <div className="empty-state">
-          <div className="spinner" style={{ margin: '0 auto' }}></div>
+      <PageTransition>
+        <LiquidSectionHeader title="岗位列表" subtitle="管理已发现的岗位" icon={FileText} />
+        <div className="liquid-empty">
+          <div className="liquid-spinner" style={{ margin: '0 auto' }}></div>
         </div>
-      </div>
+      </PageTransition>
     )
   }
 
   return (
-    <>
-      <div className="page-header">
-        <h2>岗位列表</h2>
-        <p>管理已发现的岗位</p>
-      </div>
+    <PageTransition>
+      <LiquidSectionHeader title="岗位列表" subtitle="管理已发现的岗位" icon={FileText} />
 
-      <div className="card">
+      <LiquidCard delay={0}>
         <div className="card-header">
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
             <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="form-control" style={{ width: '140px' }}>
@@ -342,12 +341,13 @@ export default function Jobs({ onToast }) {
                 onChange={(e) => setSearchCompany(e.target.value)}
                 style={{ width: '180px', paddingRight: '30px' }}
               />
-              <Search style={{ position: 'absolute', right: '8px', width: '14px', height: '14px', color: 'var(--text-muted)' }} />
+              <MagnifyingGlass style={{ position: 'absolute', right: '8px', width: '14px', height: '14px', color: 'var(--text-muted)' }} />
             </div>
           </div>
           <div className="btn-group">
-            <button
-              className="btn btn-secondary"
+            <MagneticButton
+              variant="secondary"
+              className="btn-sm"
               onClick={handleSelectAll}
               disabled={filteredJobs.length === 0 || Boolean(batchAction)}
               title="选择或取消选择当前筛选结果"
@@ -358,79 +358,84 @@ export default function Jobs({ onToast }) {
                 <Square style={{ width: '14px', height: '14px', marginRight: '6px' }} />
               )}
               全选当前列表
-            </button>
+            </MagneticButton>
             {selectedIds.size > 0 && (
               <>
-                <button
-                  className="btn btn-secondary"
+                <MagneticButton
+                  variant="secondary"
+                  className="btn-sm"
                   onClick={() => handleBatchAction('liveness')}
                   disabled={Boolean(batchAction) || isBatchDeleting}
                   title="批量检查选中岗位有效性"
                 >
                   {batchAction === 'liveness' ? (
-                    <Loader2 style={{ width: '14px', height: '14px', marginRight: '6px', animation: 'spin 1s linear infinite' }} />
+                    <Spinner style={{ width: '14px', height: '14px', marginRight: '6px', animation: 'spin 1s linear infinite' }} />
                   ) : (
                     <CheckCircle style={{ width: '14px', height: '14px', marginRight: '6px' }} />
                   )}
                   {batchButtonLabel('liveness', '批量检查')}
-                </button>
-                <button
-                  className="btn btn-primary"
+                </MagneticButton>
+                <MagneticButton
+                  variant="primary"
+                  className="btn-sm"
                   onClick={() => handleBatchAction('extract')}
                   disabled={Boolean(batchAction) || isBatchDeleting}
                   title="批量提取选中岗位详情"
                 >
                   {batchAction === 'extract' ? (
-                    <Loader2 style={{ width: '14px', height: '14px', marginRight: '6px', animation: 'spin 1s linear infinite' }} />
+                    <Spinner style={{ width: '14px', height: '14px', marginRight: '6px', animation: 'spin 1s linear infinite' }} />
                   ) : (
-                    <RefreshCw style={{ width: '14px', height: '14px', marginRight: '6px' }} />
+                    <ArrowsClockwise style={{ width: '14px', height: '14px', marginRight: '6px' }} />
                   )}
                   {batchButtonLabel('extract', '批量提取')}
-                </button>
-                <button
-                  className="btn btn-primary"
+                </MagneticButton>
+                <MagneticButton
+                  variant="primary"
+                  className="btn-sm"
                   onClick={() => handleBatchAction('optimize')}
                   disabled={Boolean(batchAction) || isBatchDeleting}
                   title="批量 AI 优化选中岗位的 JD"
                 >
                   {batchAction === 'optimize' ? (
-                    <Loader2 style={{ width: '14px', height: '14px', marginRight: '6px', animation: 'spin 1s linear infinite' }} />
+                    <Spinner style={{ width: '14px', height: '14px', marginRight: '6px', animation: 'spin 1s linear infinite' }} />
                   ) : (
-                    <RefreshCw style={{ width: '14px', height: '14px', marginRight: '6px' }} />
+                    <ArrowsClockwise style={{ width: '14px', height: '14px', marginRight: '6px' }} />
                   )}
                   {batchButtonLabel('optimize', '批量优化JD')}
-                </button>
-                <button
-                  className="btn btn-secondary"
+                </MagneticButton>
+                <MagneticButton
+                  variant="secondary"
+                  className="btn-sm"
                   onClick={() => handleBatchAction('evaluate')}
                   disabled={Boolean(batchAction) || isBatchDeleting}
                   title="批量 AI 评分选中岗位"
                 >
                   {batchAction === 'evaluate' ? (
-                    <Loader2 style={{ width: '14px', height: '14px', marginRight: '6px', animation: 'spin 1s linear infinite' }} />
+                    <Spinner style={{ width: '14px', height: '14px', marginRight: '6px', animation: 'spin 1s linear infinite' }} />
                   ) : (
                     <FileText style={{ width: '14px', height: '14px', marginRight: '6px' }} />
                   )}
                   {batchButtonLabel('evaluate', '批量评分')}
-                </button>
-                <button 
-                  className="btn btn-danger" 
+                </MagneticButton>
+                <MagneticButton 
+                  variant="primary"
+                  className="btn-sm" 
                   onClick={() => setShowConfirmModal(true)}
                   disabled={isBatchDeleting || Boolean(batchAction)}
                   style={{ marginRight: '8px' }}
                 >
                   {isBatchDeleting ? (
                     <>
-                      <Loader2 style={{ width: '14px', height: '14px', marginRight: '6px', animation: 'spin 1s linear infinite' }} />
+                      <Spinner style={{ width: '14px', height: '14px', marginRight: '6px', animation: 'spin 1s linear infinite' }} />
                       删除中...
                     </>
                   ) : (
                     <>
-                      <Trash2 style={{ width: '14px', height: '14px', marginRight: '6px' }} />
+                      <Trash style={{ width: '14px', height: '14px', marginRight: '6px' }} />
                       批量删除 ({selectedIds.size})
                     </>
                   )}
-                </button>
+                </MagneticButton>
               </>
             )}
             <select value={selectedProvider} onChange={(e) => setSelectedProvider(e.target.value)} className="form-control" style={{ width: '220px' }}>
@@ -441,16 +446,16 @@ export default function Jobs({ onToast }) {
                 </option>
               ))}
             </select>
-            <button className="btn btn-secondary" onClick={handleValidate} title="校验岗位数据完整性">
-              <AlertTriangle style={{ width: '14px', height: '14px', marginRight: '6px' }} />
+            <MagneticButton variant="secondary" className="btn-sm" onClick={handleValidate} title="校验岗位数据完整性">
+              <Warning style={{ width: '14px', height: '14px', marginRight: '6px' }} />
               数据校验
-            </button>
+            </MagneticButton>
           </div>
         </div>
 
         {validationResult && validationResult.issueCount > 0 && (
           <div style={{ padding: '12px 24px', background: 'var(--warning-tint)', borderBottom: '1px solid var(--border-color)', fontSize: '13px', color: 'var(--warning-color)' }}>
-            <AlertTriangle style={{ width: '14px', height: '14px', marginRight: '6px', verticalAlign: 'middle' }} />
+            <Warning style={{ width: '14px', height: '14px', marginRight: '6px', verticalAlign: 'middle' }} />
             发现 {validationResult.issueCount} 条数据问题：
             {validationResult.issues.slice(0, 5).map((issue, i) => (
               <span key={issue.id} style={{ marginLeft: '8px' }}>
@@ -495,7 +500,7 @@ export default function Jobs({ onToast }) {
             {filteredJobs.map((job) => (
               <tr 
                 key={job.id} 
-                className={selectedIds.has(job.id) ? 'selected-row' : ''}
+                className={`liquid-table-row ${selectedIds.has(job.id) ? 'selected-row' : ''}`}
               >
                 <td>
                   <button 
@@ -530,25 +535,25 @@ export default function Jobs({ onToast }) {
                   ) : '-'}
                 </td>
                 <td>
-                  <button className="btn btn-secondary btn-sm" onClick={() => handleViewDetail(job)} title="查看详情">
+                  <MagneticButton variant="secondary" className="btn-sm" onClick={() => handleViewDetail(job)} title="查看详情">
                     <Eye style={{ width: '14px', height: '14px' }} />
-                  </button>
-                  <button className="btn btn-secondary btn-sm" onClick={() => handleLiveness(job.id)} title="检查有效性">
+                  </MagneticButton>
+                  <MagneticButton variant="secondary" className="btn-sm" onClick={() => handleLiveness(job.id)} title="检查有效性">
                     <CheckCircle style={{ width: '14px', height: '14px' }} />
-                  </button>
-                  <button className="btn btn-primary btn-sm" onClick={() => handleExtract(job.id)} title="提取岗位详情">
-                    <RefreshCw style={{ width: '14px', height: '14px' }} />
-                  </button>
-                  <button className="btn btn-secondary btn-sm" onClick={() => handleEvaluate(job.id)} disabled={evaluatingId === job.id} title="AI 评分">
+                  </MagneticButton>
+                  <MagneticButton variant="primary" className="btn-sm" onClick={() => handleExtract(job.id)} title="提取岗位详情">
+                    <ArrowsClockwise style={{ width: '14px', height: '14px' }} />
+                  </MagneticButton>
+                  <MagneticButton variant="secondary" className="btn-sm" onClick={() => handleEvaluate(job.id)} disabled={evaluatingId === job.id} title="AI 评分">
                     <FileText style={{ width: '14px', height: '14px' }} />
                     {evaluatingId === job.id ? '评分中' : ''}
-                  </button>
-                  <button className="btn btn-success btn-sm" onClick={() => handleAddToTracker(job)} title="添加到投递追踪">
+                  </MagneticButton>
+                  <MagneticButton variant="primary" className="btn-sm" onClick={() => handleAddToTracker(job)} title="添加到投递追踪">
                     <Plus style={{ width: '14px', height: '14px' }} />
-                  </button>
-                  <button type="button" className="btn btn-danger btn-sm" onClick={() => handleDelete(job.id)} title="删除">
-                    <Trash2 style={{ width: '14px', height: '14px' }} />
-                  </button>
+                  </MagneticButton>
+                  <MagneticButton variant="primary" className="btn-sm" onClick={() => handleDelete(job.id)} title="删除">
+                    <Trash style={{ width: '14px', height: '14px' }} />
+                  </MagneticButton>
                 </td>
               </tr>
             ))}
@@ -556,12 +561,12 @@ export default function Jobs({ onToast }) {
         </table>
 
         {filteredJobs.length === 0 && (
-          <div className="empty-state">
-            <FileText />
+          <div className="liquid-empty">
+            <FileText size={32} />
             <p>暂无岗位数据</p>
           </div>
         )}
-      </div>
+      </LiquidCard>
 
       {showDetail && selectedJob && (
         <div className="modal-overlay" onClick={() => setShowDetail(false)}>
@@ -572,7 +577,7 @@ export default function Jobs({ onToast }) {
             </div>
             <div className="modal-body-scroll">
               {isLoadingDetail ? (
-                <div style={{ padding: '24px', textAlign: 'center' }}><div className="spinner" style={{ margin: '0 auto' }}></div></div>
+                <div style={{ padding: '24px', textAlign: 'center' }}><div className="liquid-spinner" style={{ margin: '0 auto' }}></div></div>
               ) : (
                 <>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -615,15 +620,16 @@ export default function Jobs({ onToast }) {
                         style={{ flex: 1 }}
                       />
                       <a href={editableUrl || selectedJob.url} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm" title="打开 URL">
-                        <ExternalLink style={{ width: '14px', height: '14px' }} />
+                        <ArrowSquareOut style={{ width: '14px', height: '14px' }} />
                       </a>
-                      <button
-                        className="btn btn-primary btn-sm"
+                      <MagneticButton
+                        variant="primary"
+                        className="btn-sm"
                         onClick={handleSaveUrl}
                         disabled={isSavingUrl || !editableUrl.trim() || editableUrl === selectedJob.url}
                       >
                         {isSavingUrl ? '保存中...' : '保存 URL'}
-                      </button>
+                      </MagneticButton>
                     </div>
                   </div>
                   {selectedJob.parsed && (
@@ -713,26 +719,28 @@ export default function Jobs({ onToast }) {
                       placeholder="从已登录的招聘页面复制职位描述、任职要求等内容后粘贴到这里"
                       style={{ fontSize: '12px' }}
                     />
-                    <button
-                      className="btn btn-primary btn-sm"
+                    <MagneticButton
+                      variant="primary"
+                      className="btn-sm"
                       onClick={handleSaveManualJd}
                       disabled={isSavingManualJd || !manualJdText.trim()}
                       style={{ marginTop: '8px' }}
                     >
                       {isSavingManualJd ? '保存中...' : '保存岗位描述'}
-                    </button>
-                    <button
-                      className="btn btn-secondary btn-sm"
+                    </MagneticButton>
+                    <MagneticButton
+                      variant="secondary"
+                      className="btn-sm"
                       onClick={() => handleOptimizeJd(selectedJob.id)}
                       disabled={optimizingId === selectedJob.id || (!selectedJob.raw_text && !selectedJob.description)}
                       style={{ marginTop: '8px', marginLeft: '8px' }}
                     >
                       {optimizingId === selectedJob.id ? '优化中...' : 'AI 优化JD'}
-                    </button>
+                    </MagneticButton>
                   </div>
                   {!selectedJob.raw_text && !selectedJob.description && !selectedJob.parsed && (
                     <div style={{ padding: '12px', background: 'var(--warning-tint)', borderRadius: '6px', fontSize: '13px', color: 'var(--danger-color)', marginBottom: '12px' }}>
-                      <AlertTriangle style={{ width: '14px', height: '14px', marginRight: '6px', verticalAlign: 'middle' }} />
+                      <Warning style={{ width: '14px', height: '14px', marginRight: '6px', verticalAlign: 'middle' }} />
                       该岗位尚未提取详细内容，请点击「提取」按钮获取
                     </div>
                   )}
@@ -766,12 +774,12 @@ export default function Jobs({ onToast }) {
             </div>
             <div className="modal-footer">
               {!selectedJob.raw_text && (
-                <button className="btn btn-primary" onClick={() => { handleExtract(selectedJob.id); setShowDetail(false); }}>
-                  <RefreshCw style={{ width: '14px', height: '14px', marginRight: '6px' }} />
+                <MagneticButton variant="primary" className="btn-sm" onClick={() => { handleExtract(selectedJob.id); setShowDetail(false); }}>
+                  <ArrowsClockwise style={{ width: '14px', height: '14px', marginRight: '6px' }} />
                   提取详情
-                </button>
+                </MagneticButton>
               )}
-              <button className="btn btn-secondary" onClick={() => setShowDetail(false)}>关闭</button>
+              <MagneticButton variant="secondary" className="btn-sm" onClick={() => setShowDetail(false)}>关闭</MagneticButton>
             </div>
           </div>
         </div>
@@ -782,7 +790,7 @@ export default function Jobs({ onToast }) {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <AlertTriangle style={{ width: '24px', height: '24px', color: 'var(--warning-color)' }} />
+                <Warning style={{ width: '24px', height: '24px', color: 'var(--warning-color)' }} />
                 <h3>确认批量删除</h3>
               </div>
               <button className="btn btn-close" onClick={() => setShowConfirmModal(false)}>×</button>
@@ -796,28 +804,29 @@ export default function Jobs({ onToast }) {
               </p>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowConfirmModal(false)}>取消</button>
-              <button 
-                className="btn btn-danger" 
+              <MagneticButton variant="secondary" className="btn-sm" onClick={() => setShowConfirmModal(false)}>取消</MagneticButton>
+              <MagneticButton 
+                variant="primary"
+                className="btn-sm" 
                 onClick={handleBatchDelete}
                 disabled={isBatchDeleting}
               >
                 {isBatchDeleting ? (
                   <>
-                    <Loader2 style={{ width: '14px', height: '14px', marginRight: '6px', animation: 'spin 1s linear infinite' }} />
+                    <Spinner style={{ width: '14px', height: '14px', marginRight: '6px', animation: 'spin 1s linear infinite' }} />
                     删除中...
                   </>
                 ) : (
                   <>
-                    <Trash2 style={{ width: '14px', height: '14px', marginRight: '6px' }} />
+                    <Trash style={{ width: '14px', height: '14px', marginRight: '6px' }} />
                     确认删除
                   </>
                 )}
-              </button>
+              </MagneticButton>
             </div>
           </div>
         </div>
       )}
-    </>
+    </PageTransition>
   )
 }
