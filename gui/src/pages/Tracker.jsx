@@ -368,13 +368,6 @@ export default function Tracker({ onToast }) {
         </LiquidCard>
       )}
 
-      {/* ── Followups Tab ── */}
-      {activeTab === 'tab_follow' && activeTab === 'followups' && (
-        <>
-          {/* ... will render below */}
-        </>
-      )}
-
       {activeTab === 'followups' && (
         <>
           <div className="liquid-stats-grid" style={{ marginBottom: '16px' }}>
