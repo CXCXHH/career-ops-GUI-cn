@@ -1,0 +1,85 @@
+{
+  "full_name": "张三",
+  "gender": "",
+  "age": "",
+  "phone": "138-XXXX-XXXX",
+  "email": "your-email@example.com",
+  "wechat": "",
+  "location": "",
+  "education": [
+    {
+      "school": "XX大学",
+      "degree": "本科",
+      "major": "自动化",
+      "start_date": "20XX-09",
+      "end_date": "20XX-07",
+      "gpa": "3.0",
+      "description": ""
+    }
+  ],
+  "graduation": "",
+  "target_role": "",
+  "summary": "性格沉稳抗压，具备较强的学习与逻辑分析能力，能快速适应新环境并高效推动目标达成。",
+  "photo_path": "",
+  "modules": [
+    {
+      "id": "education",
+      "name": "教育背景",
+      "type": "builtin",
+      "enabled": true
+    },
+    {
+      "id": "summary",
+      "name": "求职定位",
+      "type": "builtin",
+      "enabled": true
+    },
+    {
+      "id": "skills",
+      "name": "核心能力",
+      "type": "builtin",
+      "enabled": true
+    },
+    {
+      "id": "experience",
+      "name": "工作经历",
+      "type": "builtin",
+      "enabled": true
+    },
+    {
+      "id": "projects",
+      "name": "项目经历",
+      "type": "builtin",
+      "enabled": true
+    },
+    {
+      "id": "gaps",
+      "name": "针对岗位的补充准备",
+      "type": "builtin",
+      "enabled": true
+    }
+  ],
+  "experience": [],
+  "projects": [
+    {
+      "name": "基于PLC与HMI的物料分拣模拟控制系统",
+      "role": "个人项目",
+      "start_date": "20XX-01",
+      "end_date": "20XX-06",
+      "tech_stack": "西门子S7-1200、TIA Portal、威纶通HMI、PLCSIM、数字量/模拟量IO",
+      "description": "使用TIA Portal对西门子S7-1200进行梯形图编程，设计传送带启停、传感器触发及气缸推杆的分拣状态机，实现多颜色物料的自动分拣逻辑；\n开发触摸屏HMI，通过以太网与PLC通信，配置实时监控界面展示分拣计数、设备状态、报警记录，并设计手动/自动切换界面便于调试；\n借助PLCSIM进行仿真测试，验证分拣逻辑的正确性，平均响应时间稳定在150ms以内；",
+      "ai_generated": true,
+      "ai_target_job": "目标公司 - 目标岗位",
+      "ai_generation_reason": "自动化产线物料分拣环节的模拟实现，使用PLC与HMI，通过传感器检测物料并控制气缸进行分拣",
+      "ai_domain": "plc_automation",
+      "ai_project_type": "new_portfolio",
+      "ai_truth_level": "gap_bridging",
+      "ai_source_project_id": "",
+      "ai_risk_notes": [
+        "需确认候选人是否接触过目标PLC品牌及编程软件，建议提前学习仿真操作"
+      ],
+      "ai_generated_at": ""
+    }
+  ],
+  "github": ""
+}
