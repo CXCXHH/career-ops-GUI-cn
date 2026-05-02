@@ -27,14 +27,22 @@ modes/_profile.md
 .update-lock
 
 # User data (auto-generated during use — each user runs their own)
-data/job-radar/jobs.jsonl
-data/job-radar/companies.json
-data/job-radar/resume-profile.json
+data/job-radar/*.jsonl
+data/job-radar/*.json
+!data/job-radar/.gitkeep
 data/job-radar/resume-photo.png
+
+# Build output
+gui/dist/
 
 # User template
 template.JSON
 Template.JSON
+
+# IDE / Editor
+.trae/
+.vscode/
+.idea/
 
 # Secrets (never commit — use .env.example as template)
 .env
