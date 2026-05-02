@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
-import { Search, RefreshCw, Plus, ExternalLink, CheckSquare, Square, PlusCircle, Upload } from 'lucide-react'
+import { MagnifyingGlass, ArrowsClockwise, Plus, ArrowSquareOut, CheckSquare, Square, PlusCircle, Upload } from '@phosphor-icons/react'
 import { companiesAPI, discoveryAPI, jobsAPI } from '../api'
 import { showToast } from '../utils/toast'
+import { PageTransition, LiquidSectionHeader, LiquidCard, MagneticButton } from '../components/LiquidMotion'
+import '../styles/liquid-motion.css'
 
 const DEFAULT_KEYWORDS = ''
 
@@ -441,23 +443,20 @@ export default function Discovery({ onToast }) {
 
   if (isLoading) {
     return (
-      <div className="page-header">
-        <h2>岗位发现</h2>
-        <div className="empty-state">
-          <div className="spinner" style={{ margin: '0 auto' }}></div>
+      <PageTransition>
+        <LiquidSectionHeader title="岗位发现" subtitle="发现和管理岗位" icon={MagnifyingGlass} />
+        <div className="liquid-empty">
+          <div className="liquid-spinner" style={{ margin: '0 auto' }}></div>
         </div>
-      </div>
+      </PageTransition>
     )
   }
 
   return (
-    <>
-      <div className="page-header">
-        <h2>岗位发现</h2>
-      </div>
+    <PageTransition>
+      <LiquidSectionHeader title="岗位发现" subtitle="发现和管理岗位" icon={MagnifyingGlass} />
 
-
-      <div className="card">
+      <LiquidCard delay={0}>
         <div className="card-header">
           <h3 className="card-title">手动导入官网岗位 URL</h3>
         </div>
@@ -468,14 +467,14 @@ export default function Discovery({ onToast }) {
             onChange={(event) => setManualUrl(event.target.value)}
             placeholder="粘贴公司官网岗位详情页 URL"
           />
-          <button className="btn btn-secondary" onClick={handleImportUrl} disabled={isImporting}>
+          <MagneticButton variant="secondary" className="btn-sm" onClick={handleImportUrl} disabled={isImporting}>
             <Plus style={{ width: '14px', height: '14px', marginRight: '6px' }} />
             {isImporting ? '导入中...' : '导入 URL'}
-          </button>
+          </MagneticButton>
         </div>
-      </div>
+      </LiquidCard>
 
-      <div className="card">
+      <LiquidCard delay={0.08}>
         <div className="card-header">
           <h3 className="card-title">批量导入岗位（JSON格式）</h3>
         </div>
@@ -525,9 +524,9 @@ export default function Discovery({ onToast }) {
             </div>
           )}
         </div>
-      </div>
+      </LiquidCard>
 
-      <div className="card">
+      <LiquidCard delay={0.16}>
         <div className="card-header">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
@@ -536,17 +535,18 @@ export default function Discovery({ onToast }) {
             </div>
             {discoveredJobs.length > 0 && (
               <div className="btn-group">
-                <button className="btn btn-secondary btn-sm" onClick={handleSelectAllJobs}>
+                <MagneticButton variant="secondary" className="btn-sm" onClick={handleSelectAllJobs}>
                   {selectedJobs.size === discoveredJobs.length ? '取消全选' : '全选'}
-                </button>
-                <button 
-                  className="btn btn-primary btn-sm" 
+                </MagneticButton>
+                <MagneticButton 
+                  variant="primary" 
+                  className="btn-sm" 
                   onClick={handleAddSelectedCompanies}
                   disabled={selectedJobs.size === 0}
                 >
                   <PlusCircle style={{ width: '14px', height: '14px', marginRight: '4px' }} />
                   添加 {selectedJobs.size} 家公司到公司库
-                </button>
+                </MagneticButton>
               </div>
             )}
           </div>
@@ -575,7 +575,7 @@ export default function Discovery({ onToast }) {
           </thead>
           <tbody>
             {discoveredJobs.map((job) => (
-              <tr key={job.id} className={selectedJobs.has(job.id) ? 'selected-row' : ''}>
+              <tr key={job.id} className={`liquid-table-row ${selectedJobs.has(job.id) ? 'selected-row' : ''}`}>
                 <td>
                   <button 
                     className="btn btn-link p-0" 
@@ -604,11 +604,11 @@ export default function Discovery({ onToast }) {
                 <td>
                   <div className="btn-group">
                     <a className="btn btn-secondary btn-sm" href={job.url} target="_blank" rel="noreferrer">
-                      <ExternalLink style={{ width: '14px', height: '14px' }} />
+                      <ArrowSquareOut style={{ width: '14px', height: '14px' }} />
                     </a>
-                    <button className="btn btn-primary btn-sm" onClick={() => handleExtract(job.id)}>
+                    <MagneticButton variant="primary" className="btn-sm" onClick={() => handleExtract(job.id)}>
                       写入 pipeline
-                    </button>
+                    </MagneticButton>
                   </div>
                 </td>
               </tr>
@@ -617,12 +617,12 @@ export default function Discovery({ onToast }) {
         </table>
 
         {discoveredJobs.length === 0 && (
-          <div className="empty-state">
-            <Search />
+          <div className="liquid-empty">
+            <MagnifyingGlass size={32} />
             <p>暂无岗位。可以粘贴官网岗位 URL 导入。</p>
           </div>
         )}
-      </div>
-    </>
+      </LiquidCard>
+    </PageTransition>
   )
 }

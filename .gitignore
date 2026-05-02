@@ -15,6 +15,9 @@ batch/tracker-additions/**/*.tsv
 !batch/tracker-additions/.gitkeep
 jds/*
 !jds/.gitkeep
+interview-prep/*.json
+interview-prep/*.md
+!interview-prep/.gitkeep
 
 # User config and customization (never auto-updated)
 config/profile.yml
@@ -22,6 +25,16 @@ portals.yml
 modes/_profile.md
 .update-dismissed
 .update-lock
+
+# User data (auto-generated during use — each user runs their own)
+data/job-radar/jobs.jsonl
+data/job-radar/companies.json
+data/job-radar/resume-profile.json
+data/job-radar/resume-photo.png
+
+# User template
+template.JSON
+Template.JSON
 
 # Secrets (never commit — use .env.example as template)
 .env

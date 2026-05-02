@@ -1,7 +1,9 @@
 import { useEffect, useState, useRef } from 'react'
-import { CheckCircle, FileText, Search, User, Save, Plus, X, ChevronDown, ChevronUp } from 'lucide-react'
+import { CheckCircle, FileText, MagnifyingGlass, User, FloppyDisk, Plus, X, CaretDown, CaretUp } from '@phosphor-icons/react'
 import { onboardingAPI } from '../api'
 import { showToast } from '../utils/toast'
+import { PageTransition, LiquidSectionHeader, LiquidCard, MagneticButton } from '../components/LiquidMotion'
+import '../styles/liquid-motion.css'
 
 const emptyEducation = () => ({ school: '', degree: '', major: '', start_date: '', end_date: '', gpa: '', description: '' })
 const emptyExperience = () => ({ company: '', position: '', start_date: '', end_date: '', description: '', role: '' })
@@ -38,7 +40,7 @@ function TextInput({ label, value, onChange, placeholder, type = 'text' }) {
   return (
     <div className="form-item">
       <label>{label}</label>
-      <input className="form-input" type={type} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} />
+      <input className="form-input liquid-input" type={type} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} />
     </div>
   )
 }
@@ -47,7 +49,7 @@ function TextArea({ label, value, onChange, placeholder, rows = 4 }) {
   return (
     <div className="form-item">
       <label>{label}</label>
-      <textarea className="form-input" rows={rows} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} />
+      <textarea className="form-input liquid-input" rows={rows} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} />
     </div>
   )
 }
@@ -56,7 +58,7 @@ function FormInput({ label, value, onChange, placeholder }) {
   return (
     <div className="form-item">
       <label>{label}</label>
-      <input className="form-input" type="text" value={value || ''} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} />
+      <input className="form-input liquid-input" type="text" value={value || ''} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} />
     </div>
   )
 }
@@ -152,7 +154,7 @@ function EducationItem({ item, index, onChange, onDelete, showDelete }) {
         )}
       </div>
       <div className="form-grid-2">
-        <FormInput label="学校名称" value={item.school} onChange={(v) => onChange(index, 'school', v)} placeholder="如：湖南工程学院" />
+        <FormInput label="学校名称" value={item.school} onChange={(v) => onChange(index, 'school', v)} placeholder="如：XX大学" />
         <FormInput label="学历" value={item.degree} onChange={(v) => onChange(index, 'degree', v)} placeholder="如：本科、硕士、博士" />
         <FormInput label="专业" value={item.major} onChange={(v) => onChange(index, 'major', v)} placeholder="如：自动化" />
         <FormInput label="GPA/成绩" value={item.gpa} onChange={(v) => onChange(index, 'gpa', v)} placeholder="如：3.8/4.0" />
@@ -216,8 +218,8 @@ function ProjectItem({ item, index, onChange, onDelete }) {
 
 function StatusItem({ label, active }) {
   return (
-    <span className={`status-badge ${active ? 'status-active' : 'status-unconfirmed'}`} style={{ gap: '4px' }}>
-      {active && <CheckCircle size={12} />}
+    <span className={`liquid-tag ${active ? '' : 'liquid-status'}`} style={active ? {} : { color: 'var(--text-muted)', background: 'var(--bg-secondary)' }}>
+      {active && <CheckCircle weight="fill" size={12} style={{ marginRight: '4px' }} />}
       {label}
     </span>
   )
@@ -315,25 +317,25 @@ export default function Onboarding({ onToast }) {
   }
 
   const SaveButton = ({ section, label }) => (
-    <button
-      className="btn btn-primary"
-      style={{ fontSize: '13px', padding: '4px 12px', height: 'auto' }}
+    <MagneticButton
+      variant="primary"
+      className="btn-sm"
       onClick={() => saveSection(section)}
-      disabled={!!savingSection}
     >
-      <Save size={14} style={{ marginRight: '4px' }} />
+      <FloppyDisk size={14} style={{ marginRight: '4px' }} />
       {savingSection === section ? '保存中...' : label}
-    </button>
+    </MagneticButton>
   )
 
   return (
-    <>
-      <div className="page-header">
-        <h2>首次使用向导</h2>
-        <p>填写一次，系统自动生成简历事实库和岗位扫描配置</p>
-      </div>
+    <PageTransition>
+      <LiquidSectionHeader
+        title="首次使用向导"
+        subtitle="填写一次，系统自动生成简历事实库和岗位扫描配置"
+        icon={User}
+      />
 
-      <div className="card">
+      <LiquidCard delay={0}>
         <div className="card-header">
           <div className="card-title">初始化状态</div>
         </div>
@@ -343,15 +345,15 @@ export default function Onboarding({ onToast }) {
           <StatusItem label="portals.yml" active={status?.portals} />
           <StatusItem label="resume-profile.json" active={status?.resume_profile} />
         </div>
-      </div>
+      </LiquidCard>
 
-      <div className="card">
+      <LiquidCard delay={0.08}>
         <div className="section-header clickable" onClick={() => toggleCollapse('basic')}>
           <div className="section-title">
-            <User className="section-icon" />
+            <User className="section-icon" weight="duotone" />
             <div><h3>基本信息</h3></div>
           </div>
-          {collapsed.basic ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+          {collapsed.basic ? <CaretDown size={18} /> : <CaretUp size={18} />}
         </div>
         {!collapsed.basic && (
           <>
@@ -371,15 +373,15 @@ export default function Onboarding({ onToast }) {
         </div>
           </>
         )}
-      </div>
+      </LiquidCard>
 
-      <div className="card">
+      <LiquidCard delay={0.08}>
         <div className="section-header clickable" onClick={() => toggleCollapse('education')}>
           <div className="section-title">
-            <FileText className="section-icon" />
+            <FileText className="section-icon" weight="duotone" />
             <div><h3>教育背景</h3></div>
           </div>
-          {collapsed.education ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+          {collapsed.education ? <CaretDown size={18} /> : <CaretUp size={18} />}
         </div>
         {!collapsed.education && (
           <>
@@ -394,22 +396,22 @@ export default function Onboarding({ onToast }) {
           />
         ))}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
-          <button className="btn btn-secondary" onClick={() => addItem('education', emptyEducation)}>
+          <MagneticButton variant="secondary" className="btn-sm" onClick={() => addItem('education', emptyEducation)}>
             <Plus size={16} /> 添加教育经历
-          </button>
+          </MagneticButton>
           <SaveButton section="education" label="保存教育背景" />
         </div>
           </>
         )}
-      </div>
+      </LiquidCard>
 
-      <div className="card">
+      <LiquidCard delay={0.24}>
         <div className="section-header clickable" onClick={() => toggleCollapse('projects')}>
           <div className="section-title">
-            <FileText className="section-icon" />
+            <FileText className="section-icon" weight="duotone" />
             <div><h3>项目经历</h3></div>
           </div>
-          {collapsed.projects ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+          {collapsed.projects ? <CaretDown size={18} /> : <CaretUp size={18} />}
         </div>
         {!collapsed.projects && (
           <>
@@ -426,22 +428,22 @@ export default function Onboarding({ onToast }) {
           />
         ))}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
-          <button className="btn btn-secondary" onClick={() => addItem('projects', emptyProject)}>
+          <MagneticButton variant="secondary" className="btn-sm" onClick={() => addItem('projects', emptyProject)}>
             <Plus size={16} /> 添加项目经历
-          </button>
+          </MagneticButton>
           <SaveButton section="projects" label="保存项目经历" />
         </div>
           </>
         )}
-      </div>
+      </LiquidCard>
 
-      <div className="card">
+      <LiquidCard delay={0.32}>
         <div className="section-header clickable" onClick={() => toggleCollapse('experience')}>
           <div className="section-title">
-            <FileText className="section-icon" />
+            <FileText className="section-icon" weight="duotone" />
             <div><h3>工作/实习经历</h3></div>
           </div>
-          {collapsed.experience ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+          {collapsed.experience ? <CaretDown size={18} /> : <CaretUp size={18} />}
         </div>
         {!collapsed.experience && (
           <>
@@ -458,22 +460,22 @@ export default function Onboarding({ onToast }) {
           />
         ))}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
-          <button className="btn btn-secondary" onClick={() => addItem('experience', emptyExperience)}>
+          <MagneticButton variant="secondary" className="btn-sm" onClick={() => addItem('experience', emptyExperience)}>
             <Plus size={16} /> 添加工作/实习经历
-          </button>
+          </MagneticButton>
           <SaveButton section="experience" label="保存工作经历" />
         </div>
           </>
         )}
-      </div>
+      </LiquidCard>
 
-      <div className="card">
+      <LiquidCard delay={0.4}>
         <div className="section-header clickable" onClick={() => toggleCollapse('skills')}>
           <div className="section-title">
-            <FileText className="section-icon" />
+            <FileText className="section-icon" weight="duotone" />
             <div><h3>技能关键词</h3></div>
           </div>
-          {collapsed.skills ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+          {collapsed.skills ? <CaretDown size={18} /> : <CaretUp size={18} />}
         </div>
         {!collapsed.skills && (
           <>
@@ -483,15 +485,15 @@ export default function Onboarding({ onToast }) {
         </div>
           </>
         )}
-      </div>
+      </LiquidCard>
 
-      <div className="card">
+      <LiquidCard delay={0.48}>
         <div className="section-header clickable" onClick={() => toggleCollapse('target')}>
           <div className="section-title">
-            <Search className="section-icon" />
+            <MagnifyingGlass className="section-icon" weight="duotone" />
             <div><h3>求职目标</h3></div>
           </div>
-          {collapsed.target ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+          {collapsed.target ? <CaretDown size={18} /> : <CaretUp size={18} />}
         </div>
         {!collapsed.target && (
           <>
@@ -509,9 +511,9 @@ export default function Onboarding({ onToast }) {
         </div>
           </>
         )}
-      </div>
+      </LiquidCard>
 
-      <div className="card">
+      <LiquidCard delay={0.56}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
           <SaveButton section="all" label="全部保存" />
           {savedFiles.length > 0 && (
@@ -520,7 +522,7 @@ export default function Onboarding({ onToast }) {
             </div>
           )}
         </div>
-      </div>
-    </>
+      </LiquidCard>
+    </PageTransition>
   )
 }

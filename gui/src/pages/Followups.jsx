@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
-import { Bell, RefreshCw, Send, Clock, Mail, CheckCircle, AlertTriangle, Flame, Snowflake, Filter } from 'lucide-react'
+import { Bell, ArrowClockwise, PaperPlane, Clock, EnvelopeSimple, CheckCircle, Warning, Flame, Snowflake, Funnel } from '@phosphor-icons/react'
 import { followupsAPI } from '../api'
 import { showToast } from '../utils/toast'
+import { PageTransition, LiquidSectionHeader, LiquidCard, MagneticButton } from '../components/LiquidMotion'
+import '../styles/liquid-motion.css'
 
 const URGENCY_CONFIG = {
   urgent: { label: '紧急', color: 'var(--danger-color)', bg: 'var(--danger-tint)', icon: Flame },
-  overdue: { label: '逾期', color: 'var(--warning-color)', bg: 'var(--warning-tint)', icon: AlertTriangle },
+  overdue: { label: '逾期', color: 'var(--warning-color)', bg: 'var(--warning-tint)', icon: Warning },
   waiting: { label: '等待中', color: 'var(--primary-color)', bg: 'var(--primary-tint)', icon: Clock },
   cold: { label: '已冷却', color: 'var(--text-secondary)', bg: 'var(--bg-secondary)', icon: Snowflake },
 }
@@ -100,46 +102,49 @@ export default function Followups({ onToast }) {
 
   if (isLoading) {
     return (
-      <div className="page-header">
-        <h2>跟进提醒</h2>
-        <div className="empty-state">
-          <div className="spinner" style={{ margin: '0 auto' }}></div>
+      <PageTransition>
+        <LiquidSectionHeader title="跟进提醒" subtitle="基于投递状态的跟进节奏引擎，自动计算下次跟进时间" icon={Bell} />
+        <div className="liquid-empty">
+          <div className="liquid-spinner" style={{ margin: '0 auto' }}></div>
         </div>
-      </div>
+      </PageTransition>
     )
   }
 
   return (
-    <>
-      <div className="page-header">
-        <h2>跟进提醒</h2>
-        <p>基于投递状态的跟进节奏引擎，自动计算下次跟进时间</p>
-      </div>
+    <PageTransition>
+      <LiquidSectionHeader title="跟进提醒" subtitle="基于投递状态的跟进节奏引擎，自动计算下次跟进时间" icon={Bell} />
 
       {/* 统计概览 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+      <div className="liquid-stats-grid" style={{ marginBottom: '16px' }}>
         {Object.entries(URGENCY_CONFIG).map(([key, cfg]) => {
           const Icon = cfg.icon
           return (
-            <div key={key} style={{
-              background: cfg.bg, borderRadius: '8px', padding: '14px 16px',
-              border: `1px solid ${cfg.color}22`, cursor: 'pointer',
-              outline: filterUrgency === key ? `2px solid ${cfg.color}` : 'none'
-            }} onClick={() => setFilterUrgency(filterUrgency === key ? 'all' : key)}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                <Icon style={{ width: '16px', height: '16px', color: cfg.color }} />
-                <span style={{ fontSize: '13px', fontWeight: 600, color: cfg.color }}>{cfg.label}</span>
+            <LiquidCard key={key} delay={0}>
+              <div
+                style={{
+                  background: cfg.bg, borderRadius: '12px', padding: '14px 16px',
+                  border: `1px solid ${cfg.color}22`, cursor: 'pointer',
+                  outline: filterUrgency === key ? `2px solid ${cfg.color}` : 'none',
+                  transition: 'all 0.3s ease'
+                }}
+                onClick={() => setFilterUrgency(filterUrgency === key ? 'all' : key)}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                  <Icon style={{ width: '16px', height: '16px', color: cfg.color }} />
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: cfg.color }}>{cfg.label}</span>
+                </div>
+                <div style={{ fontSize: '22px', fontWeight: 'bold', color: cfg.color }}>{stats[key]}</div>
               </div>
-              <div style={{ fontSize: '22px', fontWeight: 'bold', color: cfg.color }}>{stats[key]}</div>
-            </div>
+            </LiquidCard>
           )
         })}
       </div>
 
-      <div className="card">
+      <LiquidCard>
         <div className="card-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Filter style={{ width: '14px', height: '14px', color: 'var(--text-muted)' }} />
+            <Funnel style={{ width: '14px', height: '14px', color: 'var(--text-muted)' }} />
             <select value={filterUrgency} onChange={(e) => setFilterUrgency(e.target.value)} className="form-control" style={{ width: '120px' }}>
               <option value="all">全部</option>
               <option value="urgent">紧急</option>
@@ -148,10 +153,10 @@ export default function Followups({ onToast }) {
               <option value="cold">已冷却</option>
             </select>
           </div>
-          <button className="btn btn-secondary" onClick={handleRefresh}>
-            <RefreshCw style={{ width: '14px', height: '14px', marginRight: '6px' }} />
+          <MagneticButton variant="secondary" className="btn-sm" onClick={handleRefresh}>
+            <ArrowClockwise style={{ width: '14px', height: '14px', marginRight: '6px' }} />
             刷新
-          </button>
+          </MagneticButton>
         </div>
 
         <table className="table">
@@ -172,7 +177,7 @@ export default function Followups({ onToast }) {
               const uCfg = URGENCY_CONFIG[followup.urgency] || URGENCY_CONFIG.waiting
               const UrgencyIcon = uCfg.icon
               return (
-                <tr key={followup.id}>
+                <tr key={followup.id} className="liquid-table-row">
                   <td style={{ fontWeight: 500 }}>{followup.company}</td>
                   <td>{followup.role}</td>
                   <td>
@@ -196,12 +201,12 @@ export default function Followups({ onToast }) {
                   <td>
                     {followup.urgency !== 'cold' && (
                       <>
-                        <button className="btn btn-secondary btn-sm" onClick={() => handleSendMessage(followup)} title="记录跟进消息">
-                          <Mail style={{ width: '14px', height: '14px' }} />
-                        </button>
-                        <button className="btn btn-primary btn-sm" onClick={() => handleMarkSent(followup.id)} title="标记已跟进">
+                        <MagneticButton variant="secondary" className="btn-sm" onClick={() => handleSendMessage(followup)} title="记录跟进消息">
+                          <EnvelopeSimple style={{ width: '14px', height: '14px' }} />
+                        </MagneticButton>
+                        <MagneticButton variant="primary" className="btn-sm" onClick={() => handleMarkSent(followup.id)} title="标记已跟进">
                           <CheckCircle style={{ width: '14px', height: '14px' }} />
-                        </button>
+                        </MagneticButton>
                       </>
                     )}
                   </td>
@@ -212,19 +217,19 @@ export default function Followups({ onToast }) {
         </table>
 
         {followups.length === 0 && (
-          <div className="empty-state">
-            <Bell />
+          <div className="liquid-empty">
+            <Bell size={32} />
             <p>暂无跟进任务</p>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>请先在「投递追踪」页面添加投递记录</p>
           </div>
         )}
         {followups.length > 0 && sortedFollowups.length === 0 && (
-          <div className="empty-state">
-            <Filter />
+          <div className="liquid-empty">
+            <Funnel size={32} />
             <p>当前筛选无结果</p>
           </div>
         )}
-      </div>
+      </LiquidCard>
 
       {/* 发送跟进消息 Modal */}
       {showMessageModal && selectedFollowup && (
@@ -253,15 +258,15 @@ export default function Followups({ onToast }) {
               />
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowMessageModal(false)}>取消</button>
-              <button className="btn btn-primary" onClick={handleSend} disabled={!messageText.trim()}>
-                <Send style={{ width: '14px', height: '14px', marginRight: '6px' }} />
+              <MagneticButton variant="secondary" onClick={() => setShowMessageModal(false)}>取消</MagneticButton>
+              <MagneticButton variant="primary" onClick={handleSend} disabled={!messageText.trim()}>
+                <PaperPlane style={{ width: '14px', height: '14px', marginRight: '6px' }} />
                 记录跟进
-              </button>
+              </MagneticButton>
             </div>
           </div>
         </div>
       )}
-    </>
+    </PageTransition>
   )
 }

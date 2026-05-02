@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit2, Trash2, Search, Building2, Globe, Tag, MapPin, CheckSquare, Square, AlertTriangle, X, Loader2 } from 'lucide-react'
+import { Plus, PencilSimple, Trash, MagnifyingGlass, Buildings, Globe, Tag, MapPin, CheckSquare, Square, Warning, X, Spinner } from '@phosphor-icons/react'
 import { companiesAPI } from '../api'
+import { PageTransition, LiquidSectionHeader, LiquidCard, MagneticButton } from '../components/LiquidMotion'
+import '../styles/liquid-motion.css'
 
 export default function Companies({ onToast }) {
   const [companies, setCompanies] = useState([])
@@ -160,63 +162,52 @@ export default function Companies({ onToast }) {
     setShowModal(true)
   }
 
-  const filteredCompanies = companies.filter(c => 
+  const filteredCompanies = companies.filter(c =>
     c.name.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   if (isLoading) {
     return (
-      <div className="page-header">
-        <h2>公司库</h2>
-        <div className="empty-state">
-          <div className="spinner" style={{ margin: '0 auto' }}></div>
+      <PageTransition>
+        <LiquidSectionHeader title="公司库" subtitle="管理搜索自动发现和手动添加的公司" icon={Buildings} />
+        <div className="liquid-empty">
+          <div className="liquid-spinner" style={{ margin: '0 auto 20px' }}></div>
+          <p>加载中...</p>
         </div>
-      </div>
+      </PageTransition>
     )
   }
 
   return (
-    <>
-      <div className="page-header">
-        <h2>公司库</h2>
-        <p>管理搜索自动发现和手动添加的公司</p>
-      </div>
+    <PageTransition>
+      <LiquidSectionHeader title="公司库" subtitle="管理搜索自动发现和手动添加的公司" icon={Buildings} />
 
-      <div className="card">
+      <LiquidCard>
         <div className="card-header">
-          <div className="search-box">
-            <Search style={{ width: '16px', height: '16px', marginRight: '8px' }} />
-            <input 
-              type="text" 
-              placeholder="搜索公司..." 
+          <div className="liquid-search">
+            <MagnifyingGlass size={18} />
+            <input
+              type="text"
+              placeholder="搜索公司..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             {selectedIds.size > 0 && (
-              <button 
-                className="btn btn-danger" 
+              <MagneticButton
+                variant="primary"
+                className="btn-sm"
                 onClick={() => setShowConfirmModal(true)}
-                disabled={isBatchDeleting}
               >
-                {isBatchDeleting ? (
-                  <>
-                    <Loader2 style={{ width: '16px', height: '16px', marginRight: '8px', animation: 'spin 1s linear infinite' }} />
-                    删除中...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 style={{ width: '16px', height: '16px', marginRight: '8px' }} />
-                    批量删除 ({selectedIds.size})
-                  </>
-                )}
-              </button>
+                <Trash size={16} />
+                批量删除 ({selectedIds.size})
+              </MagneticButton>
             )}
-            <button className="btn btn-primary" onClick={handleAdd}>
-              <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+            <MagneticButton variant="primary" className="btn-sm" onClick={handleAdd}>
+              <Plus size={16} />
               添加公司
-            </button>
+            </MagneticButton>
           </div>
         </div>
 
@@ -224,15 +215,15 @@ export default function Companies({ onToast }) {
           <thead>
             <tr>
               <th style={{ width: '40px' }}>
-                <button 
-                  className="btn btn-link p-0" 
+                <button
+                  className="btn btn-link p-0"
                   onClick={handleSelectAll}
                   disabled={filteredCompanies.length === 0}
                 >
                   {selectedIds.size === filteredCompanies.length && filteredCompanies.length > 0 ? (
-                    <CheckSquare style={{ width: '18px', height: '18px', color: 'var(--primary-color)' }} />
+                    <CheckSquare size={18} weight="fill" style={{ color: 'var(--primary-color)' }} />
                   ) : (
-                    <Square style={{ width: '18px', height: '18px', color: 'var(--text-muted)' }} />
+                    <Square size={18} style={{ color: 'var(--text-muted)' }} />
                   )}
                 </button>
               </th>
@@ -245,25 +236,25 @@ export default function Companies({ onToast }) {
           </thead>
           <tbody>
             {filteredCompanies.map((company) => (
-              <tr 
-                key={company.id} 
-                className={selectedIds.has(company.id) ? 'selected-row' : ''}
+              <tr
+                key={company.id}
+                className={`liquid-table-row ${selectedIds.has(company.id) ? 'selected-row' : ''}`}
               >
                 <td>
-                  <button 
-                    className="btn btn-link p-0" 
+                  <button
+                    className="btn btn-link p-0"
                     onClick={() => handleSelectOne(company.id)}
                   >
                     {selectedIds.has(company.id) ? (
-                      <CheckSquare style={{ width: '16px', height: '16px', color: 'var(--primary-color)' }} />
+                      <CheckSquare size={16} weight="fill" style={{ color: 'var(--primary-color)' }} />
                     ) : (
-                      <Square style={{ width: '16px', height: '16px', color: 'var(--border-light)' }} />
+                      <Square size={16} style={{ color: 'var(--border-light)' }} />
                     )}
                   </button>
                 </td>
                 <td>
                   <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <Building2 style={{ width: '18px', height: '18px', marginRight: '8px', color: 'var(--primary-color)' }} />
+                    <Buildings size={18} weight="duotone" style={{ marginRight: '8px', color: 'var(--primary-color)' }} />
                     {company.name}
                   </div>
                 </td>
@@ -271,7 +262,7 @@ export default function Companies({ onToast }) {
                   {company.industry_tags && company.industry_tags.length > 0 ? (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                       {company.industry_tags.slice(0, 3).map((tag, idx) => (
-                        <span key={idx} className="tag">{tag}</span>
+                        <span key={idx} className="liquid-tag">{tag}</span>
                       ))}
                     </div>
                   ) : (
@@ -281,7 +272,7 @@ export default function Companies({ onToast }) {
                 <td>
                   {company.locations && company.locations.length > 0 ? (
                     <div style={{ display: 'flex', alignItems: 'center' }}>
-                      <MapPin style={{ width: '14px', height: '14px', marginRight: '4px', color: 'var(--text-secondary)' }} />
+                      <MapPin size={14} style={{ marginRight: '4px', color: 'var(--text-secondary)' }} />
                       {company.locations.join(', ')}
                     </div>
                   ) : (
@@ -289,17 +280,17 @@ export default function Companies({ onToast }) {
                   )}
                 </td>
                 <td>
-                  <span className={`status-badge ${company.enabled ? 'status-active' : 'status-closed'}`}>
+                  <span className={`liquid-status ${company.enabled ? '' : ''}`} style={company.enabled ? { color: 'var(--success-color)', background: 'var(--success-tint)' } : { color: 'var(--danger-color)', background: 'var(--danger-tint)' }}>
                     {company.enabled ? '启用' : '禁用'}
                   </span>
                 </td>
                 <td>
-                  <button className="btn btn-secondary btn-sm" onClick={() => handleEdit(company)}>
-                    <Edit2 style={{ width: '14px', height: '14px' }} />
-                  </button>
-                  <button className="btn btn-danger btn-sm" onClick={() => handleDelete(company.id)}>
-                    <Trash2 style={{ width: '14px', height: '14px' }} />
-                  </button>
+                  <MagneticButton variant="secondary" className="btn-sm" onClick={() => handleEdit(company)}>
+                    <PencilSimple size={14} />
+                  </MagneticButton>
+                  <MagneticButton variant="primary" className="btn-sm" onClick={() => handleDelete(company.id)}>
+                    <Trash size={14} />
+                  </MagneticButton>
                 </td>
               </tr>
             ))}
@@ -307,16 +298,16 @@ export default function Companies({ onToast }) {
         </table>
 
         {filteredCompanies.length === 0 && (
-          <div className="empty-state">
-            <Building2 />
+          <div className="liquid-empty">
+            <Buildings size={64} weight="duotone" />
             <p>暂无公司数据</p>
           </div>
         )}
-      </div>
+      </LiquidCard>
 
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="liquid-modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="liquid-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h3>{editingCompany ? '编辑公司' : '添加公司'}</h3>
               <button className="btn btn-close" onClick={() => setShowModal(false)}>×</button>
@@ -324,85 +315,85 @@ export default function Companies({ onToast }) {
             <form onSubmit={handleSubmit}>
               <div className="form-group">
                 <label>公司名称</label>
-                <input 
-                  type="text" 
-                  className="form-control" 
+                <input
+                  type="text"
+                  className="form-control liquid-input"
                   value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
                 />
               </div>
               <div className="form-group">
                 <label>行业标签</label>
-                <input 
-                  type="text" 
-                  className="form-control" 
+                <input
+                  type="text"
+                  className="form-control liquid-input"
                   placeholder="用逗号分隔"
                   value={formData.industry_tags.join(', ')}
-                  onChange={(e) => setFormData({...formData, industry_tags: e.target.value.split(',').map(s => s.trim()).filter(Boolean)})}
+                  onChange={(e) => setFormData({ ...formData, industry_tags: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
                 />
               </div>
               <div className="form-group">
                 <label>地点</label>
-                <input 
-                  type="text" 
-                  className="form-control" 
+                <input
+                  type="text"
+                  className="form-control liquid-input"
                   placeholder="用逗号分隔"
                   value={formData.locations.join(', ')}
-                  onChange={(e) => setFormData({...formData, locations: e.target.value.split(',').map(s => s.trim()).filter(Boolean)})}
+                  onChange={(e) => setFormData({ ...formData, locations: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
                 />
               </div>
               <div className="form-group">
                 <label>官网</label>
-                <input 
-                  type="url" 
-                  className="form-control" 
+                <input
+                  type="url"
+                  className="form-control liquid-input"
                   value={formData.official_homepage}
-                  onChange={(e) => setFormData({...formData, official_homepage: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, official_homepage: e.target.value })}
                 />
               </div>
               <div className="form-group">
                 <label>招聘页面 URL</label>
-                <input 
-                  type="text" 
-                  className="form-control" 
+                <input
+                  type="text"
+                  className="form-control liquid-input"
                   placeholder="用逗号分隔"
                   value={formData.career_urls.join(', ')}
-                  onChange={(e) => setFormData({...formData, career_urls: e.target.value.split(',').map(s => s.trim()).filter(Boolean)})}
+                  onChange={(e) => setFormData({ ...formData, career_urls: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
                 />
               </div>
               <div className="form-group">
                 <label>搜索关键词</label>
-                <input 
-                  type="text" 
-                  className="form-control" 
+                <input
+                  type="text"
+                  className="form-control liquid-input"
                   placeholder="用逗号分隔"
                   value={formData.keywords.join(', ')}
-                  onChange={(e) => setFormData({...formData, keywords: e.target.value.split(',').map(s => s.trim()).filter(Boolean)})}
+                  onChange={(e) => setFormData({ ...formData, keywords: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
                 />
               </div>
               <div className="form-group">
                 <label>备注</label>
-                <textarea 
-                  className="form-control" 
+                <textarea
+                  className="form-control liquid-input"
                   rows="3"
                   value={formData.notes}
-                  onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 />
               </div>
               <div className="form-group">
                 <label className="checkbox-label">
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     checked={formData.enabled}
-                    onChange={(e) => setFormData({...formData, enabled: e.target.checked})}
+                    onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
                   />
                   启用
                 </label>
               </div>
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>取消</button>
-                <button type="submit" className="btn btn-primary">保存</button>
+                <MagneticButton variant="secondary" onClick={() => setShowModal(false)}>取消</MagneticButton>
+                <MagneticButton variant="primary" onClick={handleSubmit}>保存</MagneticButton>
               </div>
             </form>
           </div>
@@ -410,11 +401,11 @@ export default function Companies({ onToast }) {
       )}
 
       {showConfirmModal && (
-        <div className="modal-overlay" onClick={() => setShowConfirmModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="liquid-modal-overlay" onClick={() => setShowConfirmModal(false)}>
+          <div className="liquid-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <AlertTriangle style={{ width: '24px', height: '24px', color: 'var(--warning-color)' }} />
+                <Warning size={24} weight="fill" style={{ color: 'var(--warning-color)' }} />
                 <h3>确认批量删除</h3>
               </div>
               <button className="btn btn-close" onClick={() => setShowConfirmModal(false)}>×</button>
@@ -428,28 +419,27 @@ export default function Companies({ onToast }) {
               </p>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowConfirmModal(false)}>取消</button>
-              <button 
-                className="btn btn-danger" 
+              <MagneticButton variant="secondary" onClick={() => setShowConfirmModal(false)}>取消</MagneticButton>
+              <MagneticButton
+                variant="primary"
                 onClick={handleBatchDelete}
-                disabled={isBatchDeleting}
               >
                 {isBatchDeleting ? (
                   <>
-                    <Loader2 style={{ width: '14px', height: '14px', marginRight: '6px', animation: 'spin 1s linear infinite' }} />
+                    <Spinner size={14} className="liquid-spinner" style={{ marginRight: '6px' }} />
                     删除中...
                   </>
                 ) : (
                   <>
-                    <Trash2 style={{ width: '14px', height: '14px', marginRight: '6px' }} />
+                    <Trash size={14} style={{ marginRight: '6px' }} />
                     确认删除
                   </>
                 )}
-              </button>
+              </MagneticButton>
             </div>
           </div>
         </div>
       )}
-    </>
+    </PageTransition>
   )
 }

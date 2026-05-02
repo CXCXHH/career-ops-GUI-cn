@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
-import { ListTodo, Edit2, Trash2, FileText, Clock, CheckCircle, CheckSquare, Square } from 'lucide-react'
+import { ListChecks, PencilSimple, Trash, FileText, Clock, CheckCircle, CheckSquare, Square } from '@phosphor-icons/react'
 import { trackerAPI, jobsAPI } from '../api'
 import { showToast } from '../utils/toast'
+import { PageTransition, LiquidSectionHeader, LiquidCard, MagneticButton } from '../components/LiquidMotion'
+import '../styles/liquid-motion.css'
 
 const STATUS_LABELS = {
   Evaluated: '已评估', Applied: '已投递', Responded: '已回复',
@@ -142,31 +144,29 @@ export default function Tracker({ onToast }) {
 
   if (isLoading) {
     return (
-      <div className="page-header">
-        <h2>投递追踪</h2>
-        <div className="empty-state">
-          <div className="spinner" style={{ margin: '0 auto' }}></div>
+      <PageTransition>
+        <LiquidSectionHeader title="投递追踪" subtitle="跟踪你的求职进度" icon={ListChecks} />
+        <div className="liquid-empty">
+          <div className="liquid-spinner" style={{ margin: '0 auto' }}></div>
         </div>
-      </div>
+      </PageTransition>
     )
   }
 
   return (
-    <>
-      <div className="page-header">
-        <h2>投递追踪</h2>
-        <p>跟踪你的求职进度</p>
-      </div>
+    <PageTransition>
+      <LiquidSectionHeader title="投递追踪" subtitle="跟踪你的求职进度" icon={ListChecks} />
 
-      <div className="card">
+      <LiquidCard>
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             {selectedIds.size > 0 && (
               <>
                 <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>已选 {selectedIds.size} 项</span>
-                <button className="btn btn-danger btn-sm" onClick={handleBatchDelete} disabled={isBatchDeleting}>
+                <MagneticButton variant="primary" className="btn-sm" onClick={handleBatchDelete} disabled={isBatchDeleting}>
+                  <Trash style={{ width: '14px', height: '14px', marginRight: '4px' }} />
                   批量删除{isBatchDeleting ? '中...' : ''}
-                </button>
+                </MagneticButton>
               </>
             )}
           </div>
@@ -201,7 +201,7 @@ export default function Tracker({ onToast }) {
           </thead>
           <tbody>
             {filteredTracker.map((record, index) => (
-              <tr key={record.rowId}>
+              <tr key={record.rowId} className="liquid-table-row">
                 <td>
                   <button onClick={() => toggleSelect(record.rowId)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                     {selectedIds.has(record.rowId) ? <CheckSquare size={16} /> : <Square size={16} />}
@@ -248,13 +248,13 @@ export default function Tracker({ onToast }) {
                 </td>
                 <td>
                   {record.reportPath && (
-                    <button className="btn btn-secondary btn-sm" onClick={() => handleShowReport(record)} title="查看AI评估报告">
+                    <MagneticButton variant="secondary" className="btn-sm" onClick={() => handleShowReport(record)} title="查看AI评估报告">
                       报告
-                    </button>
+                    </MagneticButton>
                   )}
-                  <button className="btn btn-danger btn-sm" onClick={() => handleDelete(record.rowId)} title="删除记录">
-                    <Trash2 style={{ width: '14px', height: '14px' }} />
-                  </button>
+                  <MagneticButton variant="primary" className="btn-sm" onClick={() => handleDelete(record.rowId)} title="删除记录">
+                    <Trash style={{ width: '14px', height: '14px' }} />
+                  </MagneticButton>
                 </td>
               </tr>
             ))}
@@ -262,19 +262,19 @@ export default function Tracker({ onToast }) {
         </table>
 
         {filteredTracker.length === 0 && (
-          <div className="empty-state">
-            <ListTodo />
+          <div className="liquid-empty">
+            <ListChecks size={32} />
             <p>暂无投递记录</p>
           </div>
         )}
-      </div>
+      </LiquidCard>
 
       {showReportModal && (
         <div className="modal-overlay" onClick={() => setShowReportModal(false)}>
           <div className="modal modal-wide" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h3 style={{ margin: 0 }}>{reportTitle}</h3>
-              <button className="btn btn-secondary btn-sm" onClick={() => setShowReportModal(false)}>关闭</button>
+              <MagneticButton variant="secondary" className="btn-sm" onClick={() => setShowReportModal(false)}>关闭</MagneticButton>
             </div>
             <div className="modal-body-scroll">
               {!reportJob && (
@@ -314,6 +314,6 @@ export default function Tracker({ onToast }) {
           </div>
         </div>
       )}
-    </>
+    </PageTransition>
   )
 }

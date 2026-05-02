@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Trash2, ArrowUpCircle, CheckSquare, Square, ExternalLink } from 'lucide-react'
-import { candidatesAPI, jobsAPI } from '../api'
+import { Trash, ArrowUp, CheckSquare, Square, ArrowSquareOut } from '@phosphor-icons/react'
+import { candidatesAPI } from '../api'
 import { showToast } from '../utils/toast'
+import { PageTransition, LiquidSectionHeader, LiquidCard, MagneticButton } from '../components/LiquidMotion'
+import '../styles/liquid-motion.css'
 
 export default function Candidates({ onToast }) {
   const [candidates, setCandidates] = useState([])
@@ -90,52 +92,50 @@ export default function Candidates({ onToast }) {
 
   if (isLoading) {
     return (
-      <div className="page-header">
-        <h2>候选区</h2>
-        <div className="empty-state"><div className="spinner" style={{ margin: '0 auto' }}></div></div>
-      </div>
+      <PageTransition>
+        <LiquidSectionHeader title="候选区" subtitle="低置信或待验证的岗位，确认后可移入正式岗位列表" icon={CheckSquare} />
+        <div className="liquid-empty">
+          <div className="liquid-spinner" style={{ margin: '0 auto 20px' }}></div>
+          <p>加载中...</p>
+        </div>
+      </PageTransition>
     )
   }
 
   return (
-    <>
-      <div className="page-header">
-        <h2>候选区</h2>
-        <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-          低置信或待验证的岗位，确认后可移入正式岗位列表
-        </p>
-      </div>
+    <PageTransition>
+      <LiquidSectionHeader title="候选区" subtitle="低置信或待验证的岗位，确认后可移入正式岗位列表" icon={CheckSquare} />
 
       {candidates.length > 0 && (
         <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-          <button className="btn btn-secondary" onClick={handleBatchPromote} disabled={selectedIds.size === 0}>
-            <ArrowUpCircle style={{ width: '14px', height: '14px', marginRight: '6px' }} />
+          <MagneticButton variant="primary" className="btn-sm" onClick={handleBatchPromote} disabled={selectedIds.size === 0}>
+            <ArrowUp size={14} />
             确认入选 ({selectedIds.size})
-          </button>
-          <button className="btn btn-danger" onClick={handleBatchDelete} disabled={selectedIds.size === 0}>
-            <Trash2 style={{ width: '14px', height: '14px', marginRight: '6px' }} />
+          </MagneticButton>
+          <MagneticButton variant="primary" className="btn-sm" onClick={handleBatchDelete} disabled={selectedIds.size === 0}>
+            <Trash size={14} />
             批量删除 ({selectedIds.size})
-          </button>
+          </MagneticButton>
         </div>
       )}
 
       {candidates.length === 0 ? (
-        <div className="card">
-          <div className="empty-state">
+        <LiquidCard>
+          <div className="liquid-empty">
             <p>候选区为空</p>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
               导入 JSON 时，validation_status 为 blocked/unverified_low_priority 的岗位会进入候选区；expired/dead 会被拒绝
             </p>
           </div>
-        </div>
+        </LiquidCard>
       ) : (
-        <div className="card" style={{ padding: 0 }}>
+        <LiquidCard style={{ padding: 0 }}>
           <table className="table">
             <thead>
               <tr>
                 <th style={{ width: '36px' }}>
                   <span onClick={toggleSelectAll} style={{ cursor: 'pointer' }}>
-                    {selectedIds.size === candidates.length ? <CheckSquare size={16} /> : <Square size={16} />}
+                    {selectedIds.size === candidates.length ? <CheckSquare size={16} weight="fill" /> : <Square size={16} />}
                   </span>
                 </th>
                 <th>岗位</th>
@@ -147,17 +147,17 @@ export default function Candidates({ onToast }) {
             </thead>
             <tbody>
               {candidates.map(c => (
-                <tr key={c.id}>
+                <tr key={c.id} className="liquid-table-row">
                   <td>
                     <span onClick={() => toggleSelect(c.id)} style={{ cursor: 'pointer' }}>
-                      {selectedIds.has(c.id) ? <CheckSquare size={16} /> : <Square size={16} />}
+                      {selectedIds.has(c.id) ? <CheckSquare size={16} weight="fill" /> : <Square size={16} />}
                     </span>
                   </td>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       {c.url ? (
                         <a href={c.url} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink size={12} />
+                          <ArrowSquareOut size={12} />
                         </a>
                       ) : null}
                       <span>{c.title || '无标题'}</span>
@@ -165,11 +165,15 @@ export default function Candidates({ onToast }) {
                   </td>
                   <td>{c.company}</td>
                   <td>
-                    <span className={`badge ${
-                      c.validation_status === 'expired' || c.validation_status === 'dead' ? 'badge-error' :
-                      c.validation_status === 'blocked' ? 'badge-warning' :
-                      'badge-info'
-                    }`}>
+                    <span className={`liquid-status ${
+                      c.validation_status === 'expired' || c.validation_status === 'dead' ? '' :
+                      c.validation_status === 'blocked' ? '' :
+                      ''
+                    }`} style={
+                      c.validation_status === 'expired' || c.validation_status === 'dead' ? { color: 'var(--danger-color)', background: 'var(--danger-tint)' } :
+                      c.validation_status === 'blocked' ? { color: 'var(--warning-color)', background: 'var(--warning-tint)' } :
+                      { color: 'var(--info-color)', background: 'rgba(24, 144, 255, 0.1)' }
+                    }>
                       {c.validation_status || '未标注'}
                     </span>
                   </td>
@@ -178,20 +182,20 @@ export default function Candidates({ onToast }) {
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: '4px' }}>
-                      <button className="btn btn-sm btn-success" onClick={() => handlePromote(c.id)} title="确认入选">
-                        <ArrowUpCircle size={14} />
-                      </button>
-                      <button className="btn btn-sm btn-danger" onClick={() => handleDelete(c.id)} title="删除">
-                        <Trash2 size={14} />
-                      </button>
+                      <MagneticButton variant="primary" className="btn-sm" onClick={() => handlePromote(c.id)} title="确认入选">
+                        <ArrowUp size={14} />
+                      </MagneticButton>
+                      <MagneticButton variant="primary" className="btn-sm" onClick={() => handleDelete(c.id)} title="删除">
+                        <Trash size={14} />
+                      </MagneticButton>
                     </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        </LiquidCard>
       )}
-    </>
+    </PageTransition>
   )
 }

@@ -2,7 +2,7 @@ import axios from 'axios'
 
 const API_BASE = '/api'
 
-axios.defaults.timeout = 30000
+axios.defaults.timeout = 180000
 
 const unwrap = (request) => request.then((response) => {
   const payload = response.data
@@ -77,7 +77,13 @@ export const resumeAPI = {
   updateModule: (id, data) => unwrap(axios.patch(`${API_BASE}/resume/modules/${id}`, data)),
   saveModuleData: (id, data) => unwrap(axios.patch(`${API_BASE}/resume/modules/${id}/data`, data)),
   deleteModule: (id) => unwrap(axios.delete(`${API_BASE}/resume/modules/${id}`)),
-  deleteFile: (path) => unwrap(axios.delete(`${API_BASE}/resume/delete-file`, { data: { path } }))
+  deleteFile: (path) => unwrap(axios.delete(`${API_BASE}/resume/delete-file`, { data: { path } })),
+  generate: (params) => unwrap(axios.post(`${API_BASE}/resume/generate`, params)),
+  getVersions: () => unwrap(axios.get(`${API_BASE}/resume/files`)),
+  getVersion: (id) => unwrap(axios.get(`${API_BASE}/resume/files/${id}`)),
+  deleteVersion: (id) => unwrap(axios.delete(`${API_BASE}/resume/files/${id}`)),
+  deleteAllVersions: () => unwrap(axios.delete(`${API_BASE}/resume/files`)),
+  autoFill: (data) => unwrap(axios.post(`${API_BASE}/resume/auto-fill`, data))
 }
 
 export const discoveryAPI = {
