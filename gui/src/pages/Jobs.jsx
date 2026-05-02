@@ -436,7 +436,7 @@ export default function Jobs({ onToast }) {
   if (isLoading) {
     return (
       <PageTransition>
-        <LiquidSectionHeader title="岗位列表" subtitle="管理已发现的岗位" icon={FileText} />
+        <LiquidSectionHeader title="岗位" subtitle="发现和管理岗位" icon={FileText} />
         <div className="liquid-empty">
           <div className="liquid-spinner" style={{ margin: '0 auto' }}></div>
         </div>
@@ -1013,7 +1013,7 @@ export default function Jobs({ onToast }) {
                 您即将删除 <strong>{selectedIds.size}</strong> 个岗位。此操作无法撤销。
               </p>
               <p style={{ color: 'var(--danger-color)', fontSize: '13px' }}>
-                删除后，这些岗位将从岗位列表中永久移除。
+                删除后，这些岗位将被永久移除。
               </p>
             </div>
             <div className="modal-footer">
