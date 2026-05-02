@@ -26,6 +26,8 @@ export default function Jobs({ onToast }) {
   const [isSavingManualJd, setIsSavingManualJd] = useState(false)
   const [editableUrl, setEditableUrl] = useState('')
   const [isSavingUrl, setIsSavingUrl] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 10
 
   useEffect(() => {
     fetchJobs()
@@ -283,6 +285,17 @@ export default function Jobs({ onToast }) {
     return jobs.filter(j => (j.company || '').toLowerCase().includes(keyword))
   }, [jobs, searchCompany])
 
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [filterStatus, searchCompany])
+
+  const totalPages = Math.ceil(filteredJobs.length / pageSize) || 1
+
+  const paginatedJobs = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return filteredJobs.slice(start, start + pageSize)
+  }, [filteredJobs, currentPage])
+
   const companyTypeLabel = (job) => {
     return job.enterprise_type || job.company_type || job.type || job.parsed?.enterprise_type || job.parsed?.company_type || '-'
   }
@@ -497,7 +510,7 @@ export default function Jobs({ onToast }) {
             </tr>
           </thead>
           <tbody>
-            {filteredJobs.map((job) => (
+            {paginatedJobs.map((job) => (
               <tr 
                 key={job.id} 
                 className={`liquid-table-row ${selectedIds.has(job.id) ? 'selected-row' : ''}`}
@@ -559,6 +572,87 @@ export default function Jobs({ onToast }) {
             ))}
           </tbody>
         </table>
+
+        {filteredJobs.length > 0 && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '16px 8px 8px',
+            borderTop: '1px solid var(--border-color)',
+            marginTop: '8px'
+          }}>
+            <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+              第 {currentPage} / {totalPages} 页，共 {filteredJobs.length} 条
+            </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button
+                className="btn btn-secondary btn-sm"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(1)}
+                style={{ opacity: currentPage === 1 ? 0.5 : 1 }}
+              >
+                首页
+              </button>
+              <button
+                className="btn btn-secondary btn-sm"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                style={{ opacity: currentPage === 1 ? 0.5 : 1 }}
+              >
+                上一页
+              </button>
+              <div style={{
+                display: 'flex',
+                gap: '4px',
+                alignItems: 'center'
+              }}>
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum
+                  if (totalPages <= 5) {
+                    pageNum = i + 1
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i
+                  } else {
+                    pageNum = currentPage - 2 + i
+                  }
+                  return (
+                    <button
+                      key={pageNum}
+                      className={`btn btn-sm ${currentPage === pageNum ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={() => setCurrentPage(pageNum)}
+                      style={{
+                        minWidth: '32px',
+                        padding: '4px 8px',
+                        fontWeight: currentPage === pageNum ? '600' : '400'
+                      }}
+                    >
+                      {pageNum}
+                    </button>
+                  )
+                })}
+              </div>
+              <button
+                className="btn btn-secondary btn-sm"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                style={{ opacity: currentPage === totalPages ? 0.5 : 1 }}
+              >
+                下一页
+              </button>
+              <button
+                className="btn btn-secondary btn-sm"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(totalPages)}
+                style={{ opacity: currentPage === totalPages ? 0.5 : 1 }}
+              >
+                末页
+              </button>
+            </div>
+          </div>
+        )}
 
         {filteredJobs.length === 0 && (
           <div className="liquid-empty">

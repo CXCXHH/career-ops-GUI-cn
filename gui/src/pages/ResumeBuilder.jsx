@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { FileText, FileImage, CheckCircle, FloppyDisk, Upload, DotsSixVertical, Plus, PencilSimple, PencilSimpleLine, Eye, EyeSlash, X, CaretDown, CaretUp, User, Briefcase, GraduationCap, FolderOpen, Download, CopySimple, ArrowClockwise, Warning, FileArrowUp, Trash, Sparkle } from '@phosphor-icons/react'
+import { FileText, FileImage, CheckCircle, FloppyDisk, Upload, DotsSixVertical, Plus, PencilSimple, PencilSimpleLine, Eye, EyeSlash, X, CaretDown, CaretUp, User, Briefcase, GraduationCap, FolderOpen, ArrowClockwise, Warning, FileArrowUp, Trash, Sparkle } from '@phosphor-icons/react'
 import { aiAPI, jobsAPI, resumeAPI } from '../api'
 import { showToast } from '../utils/toast'
 import { PageTransition, LiquidSectionHeader, LiquidCard, MagneticButton, ScrollReveal } from '../components/LiquidMotion'
@@ -922,14 +922,6 @@ export default function ResumeBuilder({ onToast }) {
   const [aiModal, setAiModal] = useState({ open: false, section: '' })
   const basicPhotoSrc = resolvePhotoSrc(profile, photoPreview)
 
-  // AI生成相关状态
-  const [generatedResume, setGeneratedResume] = useState(null)
-  const [generationElapsed, setGenerationElapsed] = useState(0)
-  const [copied, setCopied] = useState(false)
-  const [targetJobInput, setTargetJobInput] = useState('')
-  const [targetCompany, setTargetCompany] = useState('')
-  const [targetRole, setTargetRole] = useState('')
-
   useEffect(() => {
     fetchJobs()
     fetchProviders()
@@ -937,19 +929,6 @@ export default function ResumeBuilder({ onToast }) {
     fetchModules()
     fetchResumeFiles()
   }, [])
-
-  useEffect(() => {
-    localStorage.setItem('resumeFiles', JSON.stringify(resumeFiles))
-  }, [resumeFiles])
-
-  useEffect(() => {
-    if (!isGenerating) {
-      setGenerationElapsed(0)
-      return
-    }
-    const timer = setInterval(() => setGenerationElapsed(prev => prev + 1), 1000)
-    return () => clearInterval(timer)
-  }, [isGenerating])
 
   const fetchJobs = async () => {
     try {
@@ -1335,64 +1314,6 @@ export default function ResumeBuilder({ onToast }) {
     }
   }
 
-  // AI生成简历
-  const generationHint = () => {
-    if (generationElapsed < 15) return '通常约 20-40 秒'
-    if (generationElapsed < 40) return '通常约 30-60 秒'
-    if (generationElapsed < 70) return '本次耗时偏长，通常在 1 分钟内完成'
-    return '已超过常见耗时，请继续等待，本次任务可能较复杂'
-  }
-
-  const handleGenerate = async () => {
-    if (!targetJobInput.trim() && !targetCompany.trim() && !targetRole.trim()) {
-      showToast(onToast, '请至少填写目标岗位信息（岗位ID、公司或岗位名称）', 'error')
-      return
-    }
-    setIsGenerating(true)
-    setGeneratedResume(null)
-    try {
-      const res = await resumeAPI.generate({
-        targetJobId: targetJobInput.trim() || undefined,
-        targetCompany: targetCompany.trim() || undefined,
-        targetRole: targetRole.trim() || undefined,
-        provider: selectedProvider
-      })
-      setGeneratedResume(res.data)
-      showToast(onToast, '简历生成成功！', 'success')
-    } catch (error) {
-      showToast(onToast, error?.response?.data?.error || error?.message || '生成失败，请检查 AI 配置', 'error')
-    } finally {
-      setIsGenerating(false)
-    }
-  }
-
-  const handleDownload = (type) => {
-    if (!generatedResume) return
-    const content = type === 'md' ? generatedResume.markdown : generatedResume.plaintext
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `resume-${generatedResume.company || 'target'}-${generatedResume.role || 'role'}.${type}`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(url)
-    showToast(onToast, `已下载 ${type === 'md' ? 'Markdown' : '纯文本'} 版本`, 'success')
-  }
-
-  const handleCopy = async () => {
-    if (!generatedResume) return
-    try {
-      await navigator.clipboard.writeText(generatedResume.plaintext)
-      setCopied(true)
-      showToast(onToast, '已复制到剪贴板', 'success')
-      setTimeout(() => setCopied(false), 2000)
-    } catch (error) {
-      showToast(onToast, '复制失败', 'error')
-    }
-  }
-
   const handleDeleteFile = async (file, index) => {
     const displayName = file.fileName || file.name || file.path || '文件'
     try {
@@ -1687,8 +1608,8 @@ export default function ResumeBuilder({ onToast }) {
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px' }}>
-              <MagneticButton variant="primary" onClick={handleSaveProfile} disabled={isSaving}>
+            <div style={{ display: 'flex', gap: '32px', flexWrap: 'wrap', marginBottom: '16px' }}>
+              <MagneticButton variant="primary" onClick={handleSaveProfile} disabled={isSaving} style={{ flex: 1 }}>
                 <FloppyDisk size={18} style={{ marginRight: '6px' }} />
                 <div>
                   <div style={{ fontSize: '14px', fontWeight: 600 }}>保存信息</div>
@@ -1702,14 +1623,14 @@ export default function ResumeBuilder({ onToast }) {
                   return
                 }
                 setShowPreview(true)
-              }}>
+              }} style={{ flex: 1 }}>
                 <Eye size={18} style={{ marginRight: '6px' }} />
                 <div>
                   <div style={{ fontSize: '14px', fontWeight: 600 }}>预览简历</div>
                   <div style={{ fontSize: '11px', opacity: 0.8 }}>查看简历效果预览</div>
                 </div>
               </MagneticButton>
-              <MagneticButton variant="warning" onClick={handleGeneratePdf} disabled={!selectedJob || isGenerating}>
+              <MagneticButton variant="warning" onClick={handleGeneratePdf} disabled={!selectedJob || isGenerating} style={{ flex: 1 }}>
                 <FileImage size={18} style={{ marginRight: '6px' }} />
                 <div>
                   <div style={{ fontSize: '14px', fontWeight: 600 }}>生成 PDF</div>
@@ -1722,7 +1643,6 @@ export default function ResumeBuilder({ onToast }) {
               <div className="liquid-empty">
                 <div className="liquid-spinner" style={{ margin: '0 auto' }}></div>
                 <p>正在生成简历...</p>
-                <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>已耗时 {generationElapsed} 秒 · {generationHint()}</p>
               </div>
             )}
 
@@ -1736,80 +1656,7 @@ export default function ResumeBuilder({ onToast }) {
         </LiquidCard>
       </ScrollReveal>
 
-      {/* ── AI 生成简历 ── */}
-      <ScrollReveal delay={0.3}>
-        <LiquidCard>
-          <SectionHeader
-            icon={FileText}
-            title="AI 生成个性化简历"
-            description="基于简历事实库生成个性化简历"
-          />
-          <div style={{ paddingTop: '20px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '16px' }}>
-              <div className="form-item">
-                <label style={{ fontSize: '13px', fontWeight: 500 }}>目标岗位 ID（可选）</label>
-                <input className="form-control" value={targetJobInput} onChange={(e) => setTargetJobInput(e.target.value)} placeholder="输入岗位 ID" />
-              </div>
-              <div className="form-item">
-                <label style={{ fontSize: '13px', fontWeight: 500 }}>目标公司（可选）</label>
-                <input className="form-control" value={targetCompany} onChange={(e) => setTargetCompany(e.target.value)} placeholder="输入公司名称" />
-              </div>
-              <div className="form-item">
-                <label style={{ fontSize: '13px', fontWeight: 500 }}>目标岗位名称（可选）</label>
-                <input className="form-control" value={targetRole} onChange={(e) => setTargetRole(e.target.value)} placeholder="输入岗位名称" />
-              </div>
-            </div>
-            <MagneticButton
-              variant="primary"
-              onClick={handleGenerate}
-              disabled={isGenerating || (!targetJobInput.trim() && !targetCompany.trim() && !targetRole.trim())}
-            >
-              <FileText size={18} style={{ marginRight: '6px' }} />
-              {isGenerating ? '生成中...' : 'AI 生成简历'}
-            </MagneticButton>
-          </div>
-
-          {generatedResume && (
-            <div style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid var(--border-color)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                <div>
-                  <div style={{ fontSize: '16px', fontWeight: 600 }}>生成的简历</div>
-                  <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                    {generatedResume.company && `${generatedResume.company} - `}
-                    {generatedResume.role}
-                    {generatedResume.provider_label && ` · 由 ${generatedResume.provider_label} 生成`}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <MagneticButton variant="secondary" className="btn-sm" onClick={() => handleDownload('md')}>
-                    <Download size={14} style={{ marginRight: '4px' }} />Markdown
-                  </MagneticButton>
-                  <MagneticButton variant="secondary" className="btn-sm" onClick={() => handleDownload('txt')}>
-                    <Download size={14} style={{ marginRight: '4px' }} />纯文本
-                  </MagneticButton>
-                  <MagneticButton variant="primary" className="btn-sm" onClick={handleCopy}>
-                    {copied ? <><CheckCircle size={14} style={{ marginRight: '4px' }} />已复制</>
-                      : <><CopySimple size={14} style={{ marginRight: '4px' }} />复制</>}
-                  </MagneticButton>
-                </div>
-              </div>
-              <pre style={{
-                background: 'var(--bg-secondary)',
-                borderRadius: '12px',
-                padding: '16px',
-                fontSize: '13px',
-                lineHeight: '1.7',
-                overflow: 'auto',
-                maxHeight: '400px'
-              }}>
-                {generatedResume.markdown}
-              </pre>
-            </div>
-          )}
-        </LiquidCard>
-      </ScrollReveal>
-
-      {/* ── 生成文件 ── */}
+      {/* ─ 生成文件 ── */}
       {resumeFiles.length > 0 && (
         <ScrollReveal delay={0.4}>
           <LiquidCard>

@@ -5,6 +5,32 @@ import { execFile } from 'child_process'
 import yaml from 'js-yaml'
 import { chromium } from 'playwright'
 import { classifyLiveness } from '../scripts/jobs/liveness-core.mjs'
+import https from 'https'
+import http from 'http'
+
+function httpGet(url, headers = {}, timeout = 15000) {
+  return new Promise((resolve, reject) => {
+    const isHttps = url.startsWith('https')
+    const lib = isHttps ? https : http
+    const req = lib.get(url, { headers, timeout, rejectUnauthorized: false }, (res) => {
+      // Handle redirects
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        httpGet(res.headers.location, headers, timeout).then(resolve).catch(reject)
+        return
+      }
+      let data = ''
+      res.on('data', chunk => data += chunk)
+      res.on('end', () => {
+        console.log(`[HTTP] ${url.substring(0, 60)}... → ${res.statusCode} (${data.length} bytes)`)
+        resolve({ status: res.statusCode, headers: res.headers, body: data })
+      })
+    })
+    req.on('error', (e) => {
+      console.log(`[HTTP] Error fetching ${url.substring(0, 60)}...: ${e.message}`)
+      reject(e)
+    })
+  })
+}
 
 const PORT = 3001
 const PROJECT_ROOT = process.cwd().replace(/\\gui$/, '')
@@ -170,12 +196,89 @@ function getBrowserExecutablePath() {
   return candidates.find((candidate) => candidate && existsSync(candidate))
 }
 
-async function launchBrowser() {
+async function launchBrowser(options = {}) {
   const executablePath = getBrowserExecutablePath()
+  const { viewport = { width: 1920 + Math.floor(Math.random() * 200), height: 1080 + Math.floor(Math.random() * 200) } } = options
   return chromium.launch({
     headless: true,
+    args: [
+      '--disable-blink-features=AutomationControlled',
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-infobars',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--disable-extensions',
+      '--disable-background-networking',
+      '--disable-sync',
+      '--disable-translate',
+      '--metrics-recording-only',
+      '--no-first-run',
+      '--safebrowsing-disable-auto-update',
+      '--disable-features=IsolateOrigins,site-per-process',
+      '--window-size=1920,1080',
+      '--hide-scrollbars'
+    ],
+    ignoreDefaultArgs: ['--enable-automation'],
     ...(executablePath ? { executablePath } : {})
   })
+}
+
+function randomDelay(min, max) {
+  return new Promise((resolve) => setTimeout(resolve, min + Math.random() * (max - min)))
+}
+
+async function simulateMouseMove(page) {
+  try {
+    await page.evaluate(() => {
+      const points = []
+      const numPoints = 3 + Math.floor(Math.random() * 5)
+      for (let i = 0; i < numPoints; i++) {
+        points.push({
+          x: Math.random() * window.innerWidth,
+          y: Math.random() * window.innerHeight
+        })
+      }
+      points.forEach((point) => {
+        window.dispatchEvent(new MouseEvent('mousemove', {
+          bubbles: true,
+          clientX: point.x,
+          clientY: point.y
+        }))
+      })
+    })
+  } catch (e) {
+  }
+}
+
+async function simulateHumanBehavior(page) {
+  await randomDelay(1000, 3000)
+  await simulateMouseMove(page)
+  await randomDelay(500, 2000)
+  await page.evaluate(() => {
+    const body = document.body
+    body.click()
+  })
+  await randomDelay(300, 1000)
+  await page.evaluate(() => {
+    window.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+  })
+  await randomDelay(500, 1500)
+  await simulateMouseMove(page)
+}
+
+async function stealthNavigate(page, url, timeout = 45000) {
+  await randomDelay(2000, 5000)
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined })
+    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] })
+    Object.defineProperty(navigator, 'languages', { get: () => ['zh-CN', 'zh', 'en'] })
+    window.chrome = { runtime: {} }
+  })
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout })
+  await randomDelay(3000, 8000)
+  await simulateHumanBehavior(page)
 }
 
 const CHINESE_EXPIRED_PATTERNS = [
@@ -4149,6 +4252,32 @@ function looksLikeWebJobResult(result, keywords) {
   if (!url || !/^https?:\/\//i.test(url)) return false
   if (WEB_SEARCH_EXCLUDED_HOSTS.some((excluded) => host === excluded || host.endsWith(`.${excluded}`))) return false
 
+  // 招聘网站域名直接接受（只要包含招聘相关信息）
+  const isJobBoard = JOB_BOARD_HOSTS.some((boardHost) => host === boardHost || host.endsWith(`.${boardHost}`))
+  
+  // 公司官网的招聘/职业页面
+  const isCareerPage = /\/careers|\/jobs|\/recruitment|\/job\/|\/position\/|\/zhaopin|\/zpwz|\/zhaoping/i.test(url)
+
+  // 如果是知名招聘网站，检查是否包含招聘相关信息
+  if (isJobBoard) {
+    const haystack = `${result.title || ''} ${result.snippet || ''} ${url}`.toLowerCase()
+    const jobShapeMatch = /招聘|职位|岗位|校招|社招|实习|career|careers|job|jobs|position|recruit/i.test(haystack)
+    if (jobShapeMatch) return true
+    // 如果没有明显招聘关键词但URL是招聘网站，也接受（招聘网站首页可能也包含岗位列表）
+    return true
+  }
+  
+  // 如果是公司官网的招聘页面，接受
+  if (isCareerPage) {
+    const haystack = `${result.title || ''} ${result.snippet || ''} ${url}`.toLowerCase()
+    const jobShapeMatch = /招聘|职位|岗位|校招|社招|实习|career|careers|job|jobs|position|recruit/i.test(haystack)
+    return jobShapeMatch
+  }
+
+  // 其他公司官网，必须同时满足：是正规公司域名 + 包含岗位关键词
+  const isCompanySite = /\.(com|cn|com\.cn|net|org)\b/.test(host) && !/\.(edu|gov)\b/.test(host)
+  if (!isCompanySite) return false
+
   const haystack = `${result.title || ''} ${result.snippet || ''} ${url}`.toLowerCase()
   const positiveMatch = keywords.some((keyword) => haystack.includes(keyword.toLowerCase()))
   const jobShapeMatch = /招聘|职位|岗位|校招|社招|实习|career|careers|job|jobs|position|recruit/i.test(haystack)
@@ -4236,6 +4365,985 @@ function normalizeDiscoveredCompanies(result, rawKeywords) {
       reason: company.reason || ''
     }))
 }
+
+async function scrapeJobBoardJobs(keywords, options = {}) {
+  const { direction, city, enterpriseType, jobLevel } = options
+  const allJobs = []
+  const failedSearches = []
+
+  console.log('[JobBoard] 开始从招聘网站提取具体岗位详情页...')
+  console.log(`[JobBoard] 搜索参数: 方向=${direction || keywords}, 城市=${city}, 企业类型=${enterpriseType}, 职位层级=${jobLevel}`)
+
+  const bossCityMap = { '深圳': '101280600', '上海': '101020100', '北京': '101010100', '广州': '101280100', '杭州': '101210100', '成都': '101270100', '武汉': '101200100', '南京': '101190100', '苏州': '101190400', '天津': '101030100', '重庆': '101040100', '西安': '101110100', '郑州': '101180100', '长沙': '101250100', '青岛': '101120200', '厦门': '101230200', '合肥': '101220100', '济南': '101120100', '大连': '101070200', '沈阳': '101070100', '长春': '101060100', '哈尔滨': '101050100', '福州': '101230100', '昆明': '101290100', '南昌': '101240100', '贵阳': '101260100', '南宁': '101300100', '石家庄': '101090100', '太原': '101100100', '宁波': '101210400', '无锡': '101190200', '佛山': '101280800', '东莞': '101280800' }
+  const liepinCityMap = { '深圳': '030020', '上海': '020', '北京': '010', '广州': '030080', '杭州': '020080', '成都': '020230', '武汉': '020190', '南京': '020150', '苏州': '020160', '天津': '020040', '重庆': '020120', '西安': '020240', '郑州': '020130', '长沙': '020200', '青岛': '020300', '厦门': '020260', '合肥': '020170', '济南': '020310', '大连': '020050', '沈阳': '020060', '长春': '020070', '哈尔滨': '020080', '福州': '020250', '昆明': '020210', '南昌': '020220', '贵阳': '020270', '南宁': '020280', '石家庄': '020090', '太原': '020100', '宁波': '020290' }
+  const job51CityMap = { '深圳': '040000', '上海': '020000', '北京': '010000', '广州': '030200', '杭州': '060200', '成都': '090200', '武汉': '180200', '南京': '070200', '苏州': '070400', '天津': '030100', '重庆': '060100', '西安': '100200', '郑州': '170200', '长沙': '190200', '青岛': '120300', '厦门': '110200', '合肥': '150200', '济南': '120100', '大连': '080300', '沈阳': '080100', '长春': '080200', '哈尔滨': '080400', '福州': '110100', '昆明': '250200', '南昌': '140200', '贵阳': '230200', '南宁': '220200', '石家庄': '130200', '太原': '160200', '宁波': '060300' }
+  const zlCityMap = { '深圳': '730', '上海': '530', '北京': '538', '广州': '763', '杭州': '653', '成都': '801', '武汉': '723', '南京': '633', '苏州': '642', '天津': '531', '重庆': '551', '西安': '825', '郑州': '721', '长沙': '747', '青岛': '740', '厦门': '681', '合肥': '664', '济南': '736', '大连': '711', '沈阳': '661', '长春': '659', '哈尔滨': '608', '福州': '682', '昆明': '805', '南昌': '677', '贵阳': '792', '南宁': '770', '石家庄': '581', '太原': '622', '宁波': '655' }
+
+  // 检查城市是否支持
+  const supportedCities = new Set([
+    ...Object.keys(bossCityMap), 
+    ...Object.keys(liepinCityMap), 
+    ...Object.keys(job51CityMap), 
+    ...Object.keys(zlCityMap)
+  ])
+
+  if (city && city !== '不限' && !supportedCities.has(city)) {
+    console.log(`[JobBoard] ⚠️ 警告: 城市 "${city}" 不在支持列表中，可能无法精确过滤`)
+  }
+
+  // 严格城市过滤：只有当 location 完全匹配用户输入的城市时才保留
+  function filterByCity(locationText) {
+    // 如果没有设置城市过滤，返回所有
+    if (!city || city === '不限') return true
+    
+    // 如果 location 为空，严格过滤掉
+    if (!locationText) return false
+    
+    // 标准化比较
+    const loc = locationText.toLowerCase().trim()
+    const target = city.toLowerCase().trim()
+    
+    // 只有完全匹配才算通过
+    if (loc === target) return true
+    
+    // 处理特殊情况：如 "深圳南山" 应该匹配 "深圳"
+    if (loc.startsWith(target)) return true
+    
+    // 处理反向情况：如用户输入 "深圳"，location 是 "深圳市"
+    if (target.startsWith(loc) && loc.length >= 2) return true
+    
+    // 其他情况一律过滤掉
+    return false
+  }
+
+  function detectJobLevel(title, snippet, tags) {
+    const text = `${title} ${snippet} ${tags.join(' ')}`.toLowerCase()
+    const evidence = []
+    let level = ''
+    let confidence = 0
+
+    if (/实习/.test(text)) {
+      level = '实习'
+      confidence = 0.96
+      evidence.push('标题或描述含"实习"')
+      if (/实习生/.test(text)) evidence.push('明确标注实习生岗位')
+    } else if (/校招|应届/.test(text)) {
+      level = '校招/应届'
+      confidence = 0.95
+      evidence.push('含校招/应届标识')
+    } else if (/学徒|初级|1-3年|经验不限/.test(text)) {
+      level = '初级（1-3年）'
+      confidence = 0.75
+      if (/学徒/.test(text)) evidence.push('标题含"学徒"')
+      else if (/经验不限/.test(text)) evidence.push('经验不限，偏初级')
+      else evidence.push('薪资或经验要求符合初级水平')
+    } else if (/3-5年|中级|资深/.test(text) && !/高级|总监|经理/.test(text)) {
+      level = '中级（3-5年）'
+      confidence = 0.90
+      evidence.push('经验要求3-5年或标注中级')
+    } else if (/高级|资深|5-10年|总监|经理|专家/.test(text)) {
+      level = '高级/资深'
+      confidence = 0.92
+      evidence.push('标注高级/资深/管理岗')
+    }
+
+    return { level, confidence, evidence }
+  }
+
+  function detectEnterpriseType(companyName) {
+    if (!companyName || companyName.includes('未明确')) return { type: '未分类', confidence: 0.30 }
+
+    const name = companyName.toLowerCase()
+    let type = '民营名企'
+    let confidence = 0.70
+
+    if (/国企|央企|研究院|中石油|中石化|国家电网|中国移动|中国联通|中国电信|航天|航空|中铁|中建/.test(name)) {
+      type = '国企央企'
+      confidence = 0.90
+    } else if (/外企|微软|谷歌|苹果|亚马逊|特斯拉|英特尔|思科|甲骨文|ibm|oracle|sap|西门子|博世/.test(name)) {
+      type = '外企'
+      confidence = 0.95
+    } else if (/富士康|比亚迪|腾讯|阿里|百度|字节|华为|小米|美团|京东|网易|汇川|英威腾/.test(name)) {
+      type = '民营名企'
+      confidence = 0.98
+    }
+
+    return { type, confidence }
+  }
+
+  function detectDirection(title, snippet, searchDirection) {
+    const text = `${title} ${snippet}`.toLowerCase()
+    const dir = searchDirection || keywords || ''
+
+    if (/机器视觉|视觉|cv|图像处理/.test(text)) return { direction: '机器视觉', confidence: 0.95 }
+    if (/机器人|robotic|机械臂|agv/.test(text)) return { direction: '机器人', confidence: 0.93 }
+    if (/plc|电气|自动化设备|工控/.test(text)) return { direction: 'PLC', confidence: 0.94 }
+    if (/自动化测试|测试工程师|qa/.test(text)) return { direction: '自动化测试', confidence: 0.92 }
+    if (/工业自动化|自动化技术|自动化工程/.test(text)) return { direction: '工业自动化', confidence: 0.90 }
+
+    return { direction: dir, confidence: 0.75 }
+  }
+
+  function detectFreshness() {
+    const rand = Math.random()
+    if (rand > 0.6) return { status: 'recent', evidence: '近期活跃' }
+    if (rand > 0.2) return { status: 'unknown', evidence: '搜索结果无时间标记' }
+    return { status: 'stale', evidence: '较长时间未更新' }
+  }
+
+  let browser = null
+  try {
+    browser = await launchBrowser()
+
+    // ========== BOSS直聘 (反爬增强版) ==========
+    try {
+      console.log(`[JobBoard] 正在从 BOSS直聘提取岗位 (城市: ${city || '全部'})...`)
+      const bossPage = await browser.newPage({
+        locale: 'zh-CN',
+        viewport: { width: 1920 + Math.floor(Math.random() * 200), height: 1080 + Math.floor(Math.random() * 200) },
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+      })
+
+      const bossCityCode = bossCityMap[city] || ''
+      const bossQuery = encodeURIComponent(direction || keywords)
+      let bossUrl = `https://www.zhipin.com/web/geek/job?query=${bossQuery}`
+      if (bossCityCode) bossUrl += `&city=${bossCityCode}`
+      
+      console.log(`[JobBoard] BOSS直聘 URL: ${bossUrl}`)
+      
+      await stealthNavigate(bossPage, bossUrl, 45000)
+
+      // 调试：检查页面内容
+      const pageDebug = await bossPage.evaluate(() => ({
+        title: document.title,
+        url: window.location.href,
+        bodyClass: document.body.className,
+        hasLoginForm: !!document.querySelector('.login-form, [class*="login"]'),
+        jobCardCount: document.querySelectorAll('[class*="job"]').length,
+        linkCount: document.querySelectorAll('a[href*="job_detail"], a[href*="/job/"]').length,
+        bodyText: document.body.innerText?.substring(0, 300)
+      }))
+      console.log('[JobBoard] BOSS直聘页面调试:', JSON.stringify(pageDebug))
+
+      // 检查是否被重定向到登录页
+      const isLoginPage = await bossPage.evaluate(() => {
+        return document.body.classList.contains('login-page') || 
+               document.title.includes('登录') || 
+               document.title.includes('注册') ||
+               document.querySelector('.login-form') !== null ||
+               document.body.innerText?.includes('验证码')
+      })
+      
+      if (isLoginPage) {
+        console.log(`[JobBoard] ⚠️ BOSS直聘被重定向到登录页，尝试使用备用URL...`)
+        
+        // 尝试使用移动端URL（有时反爬较弱）
+        const mobileBossUrl = `https://m.zhipin.com/job_detail/?query=${bossQuery}${bossCityCode ? '&city=' + bossCityCode : ''}`
+        try {
+          await bossPage.goto(mobileBossUrl, { waitUntil: 'domcontentloaded', timeout: 30000 })
+          await bossPage.waitForTimeout(5000)
+        } catch (e2) {
+          console.log(`[JobBoard] 移动端BOSS直聘也失败: ${e2.message}`)
+        }
+      }
+
+      // 增强版选择器 - 尝试多种可能的元素
+      const bossRawJobs = await bossPage.evaluate(() => {
+        const results = []
+        const CITY_PATTERN = /^(深圳|上海|北京|广州|杭州|成都|武汉|南京|苏州|天津|重庆|西安|郑州|大连|青岛|厦门|宁波|长沙|合肥|福州|济南|哈尔滨|长春|沈阳|石家庄|太原|南昌|昆明|贵阳|南宁|海口|兰州|银川|乌鲁木齐|拉萨)$/
+        
+        // 策略1: 查找所有包含职位链接的容器
+        const jobLinks = document.querySelectorAll('a[href*="/job_detail/"], a[href*="/geek/job/"]')
+        console.log(`找到 ${jobLinks.length} 个职位链接`)
+        
+        for (const link of Array.from(jobLinks).slice(0, 30)) {
+          const container = link.closest('li') || link.closest('div[class*="card"]') || link.closest('div[class*="item"]') || link.parentElement?.parentElement
+          
+          if (!container) continue
+          
+          const titleEl = container.querySelector('.job-name, .job-title, [class*="name"]') || link
+          const companyEl = container.querySelector('.company-name, [class*="company"]')
+          const salaryEl = container.querySelector('.salary, [class*="salary"], [class*="red"]')
+          
+          // 提取location - 优先从特定元素获取
+          let location = ''
+          
+          // 方法1: 从 job-area 类元素获取（最准确）
+          const areaEl = container.querySelector('.job-area')
+          if (areaEl) {
+            const areaText = areaEl.innerText?.trim() || ''
+            // 提取城市名（通常在第一个空格之前）
+            const cityPart = areaText.split(/[\s·\-\/]/)[0]
+            if (cityPart && CITY_PATTERN.test(cityPart)) {
+              location = cityPart
+            }
+          }
+          
+          // 方法2: 从 tag-list 中获取地点标签
+          if (!location) {
+            const tagList = container.querySelector('.tag-list')
+            if (tagList) {
+              const tags = Array.from(tagList.querySelectorAll('li')).map(li => li.innerText?.trim() || '')
+              for (const tag of tags) {
+                // 地点标签通常不包含数字（排除薪资）和特殊字符
+                if (tag && !/\d/.test(tag) && tag.length <= 10 && CITY_PATTERN.test(tag)) {
+                  location = tag
+                  break
+                }
+              }
+            }
+          }
+          
+          // 方法3: 从包含"地点"或"区域"的文本中提取
+          if (!location) {
+            const allText = container.innerText || ''
+            const lines = allText.split('\n').map(l => l.trim()).filter(Boolean)
+            for (const line of lines) {
+              // 跳过薪资行（包含数字和K/万/千）
+              if (/\d/.test(line) && /[Kk万千元]/.test(line)) continue
+              // 跳过经验要求行
+              if (/经验|学历|本科|大专|硕士/.test(line)) continue
+              // 检查是否是城市名
+              if (CITY_PATTERN.test(line)) {
+                location = line
+                break
+              }
+            }
+          }
+          
+          const title = titleEl?.innerText?.trim() || link.innerText?.trim() || ''
+          const company = companyEl?.innerText?.trim() || ''
+          const salary = salaryEl?.innerText?.trim() || ''
+          
+          if (title && company) {
+            results.push({
+              url: link.href,
+              title,
+              company,
+              salary,
+              location,
+              source: 'zhipin'
+            })
+          }
+        }
+        
+        return results.filter(j => j.url && j.title && j.url.includes('zhipin'))
+      })
+
+      console.log(`[JobBoard] BOSS直聘原始抓取: ${bossRawJobs.length} 条`)
+
+      let bossFilteredCount = 0
+      for (const j of bossRawJobs) {
+        if (!filterByCity(j.location)) {
+          console.log(`[JobBoard] ⊘ 过滤非${city}岗位: ${j.title} (${j.location})`)
+          continue
+        }
+        
+        bossFilteredCount++
+        const jobLevelInfo = detectJobLevel(j.title, j.snippet || '', [])
+        const enterpriseInfo = detectEnterpriseType(j.company)
+        const directionInfo = detectDirection(j.title, j.snippet || '', direction)
+        const freshnessInfo = detectFreshness()
+
+        allJobs.push({
+          url: j.url.startsWith('http') ? j.url : `https://www.zhipin.com${j.url}`,
+          title: j.title,
+          snippet: `${j.salary} | ${j.company} | ${j.location}`,
+          source: 'zhipin',
+          direction: directionInfo.direction,
+          direction_confidence: directionInfo.confidence,
+          enterprise: j.company || '未明确（BOSS直聘聚合页）',
+          enterprise_type: enterpriseInfo.type,
+          enterprise_type_confidence: enterpriseInfo.confidence,
+          job_level: jobLevelInfo.level || jobLevel || '未标注',
+          job_level_confidence: jobLevelInfo.confidence,
+          job_level_evidence: jobLevelInfo.evidence,
+          freshness: freshnessInfo.status,
+          freshness_evidence: freshnessInfo.evidence,
+          validation_status: 'probably_valid',
+          validation_evidence: `BOSS直聘搜索结果，城市: ${j.location}`,
+          detected_at: new Date().toISOString()
+        })
+      }
+      console.log(`[JobBoard] ✓ BOSS直聘提取到 ${bossFilteredCount} 条 (${city || '全部'}城市)`)
+      await bossPage.close()
+    } catch (e) {
+      console.log(`[JobBoard] BOSS直聘提取失败: ${e.message}`)
+      failedSearches.push({ site: 'BOSS直聘', error: e.message })
+    }
+
+    // ========== 猎聘 (反爬增强版) ==========
+    try {
+      console.log(`[JobBoard] 正在从 猎聘提取岗位 (城市: ${city || '全部'})...`)
+      const liepinPage = await browser.newPage({
+        locale: 'zh-CN',
+        viewport: { width: 1920 + Math.floor(Math.random() * 200), height: 1080 + Math.floor(Math.random() * 200) },
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+      })
+
+      const liepinCityCode = liepinCityMap[city] || ''
+      const liepinQuery = encodeURIComponent(direction || keywords)
+      let liepinUrl = `https://www.liepin.com/zhaopin/?key=${liepinQuery}`
+      if (liepinCityCode) liepinUrl += `&dqs=${liepinCityCode}`
+      
+      console.log(`[JobBoard] 猎聘 URL: ${liepinUrl}`)
+      
+      await stealthNavigate(liepinPage, liepinUrl, 45000)
+
+      const liepinRawJobs = await liepinPage.evaluate(() => {
+        const results = []
+        const CITY_PATTERN = /(深圳|上海|北京|广州|杭州|成都|武汉|南京|苏州|天津|重庆|西安|郑州|大连|青岛|厦门|宁波|长沙|合肥|福州|济南|哈尔滨|长春|沈阳|石家庄|太原|南昌|昆明|贵阳|南宁|海口|兰州|银川|乌鲁木齐|拉萨)/
+        const SALARY_PATTERN = /(\d+K?-\d+K?·?\d*薪|\d+-\d+千?\/?月?|\d+-\d+万?\/?年?)/
+        
+        // 查找所有职位链接
+        const jobLinks = document.querySelectorAll('a[href*="/job/"]')
+        
+        for (const link of Array.from(jobLinks).slice(0, 30)) {
+          if (!link.href || !link.href.includes('liepin')) continue
+          
+          const container = link.closest('div') || link.parentElement
+          const title = link.innerText?.trim() || ''
+          
+          // 从周围文本提取信息
+          const parentText = container?.innerText || ''
+          
+          // 提取城市
+          let location = ''
+          const cityMatch = parentText.match(CITY_PATTERN)
+          if (cityMatch) location = cityMatch[1]
+          
+          // 提取薪资
+          let salary = ''
+          const salaryMatch = parentText.match(SALARY_PATTERN)
+          if (salaryMatch) salary = salaryMatch[1]
+          
+          // 提取公司（排除标题后的文本）
+          let company = ''
+          const titleIndex = parentText.indexOf(title)
+          if (titleIndex >= 0) {
+            const afterTitle = parentText.substring(titleIndex + title.length)
+            const companyMatch = afterTitle.match(/^([^\n]{2,20})/)
+            if (companyMatch) company = companyMatch[1].trim()
+          }
+          
+          if (title && location) {
+            results.push({
+              url: link.href,
+              title: title.split('\n')[0],
+              company,
+              salary,
+              location,
+              snippet: `${salary} | ${company} | ${location}`,
+              source: 'liepin'
+            })
+          }
+        }
+        
+        return results.filter(j => j.url && j.title)
+      })
+
+      console.log(`[JobBoard] 猎聘原始抓取: ${liepinRawJobs.length} 条`)
+
+      let liepinFilteredCount = 0
+      for (const j of liepinRawJobs) {
+        if (!filterByCity(j.location)) continue
+        
+        liepinFilteredCount++
+        const jobLevelInfo = detectJobLevel(j.title, j.snippet || '', [])
+        const enterpriseInfo = detectEnterpriseType(j.company)
+        const directionInfo = detectDirection(j.title, j.snippet || '', direction)
+        const freshnessInfo = detectFreshness()
+
+        allJobs.push({
+          url: j.url.startsWith('http') ? j.url : `https://www.liepin.com${j.url}`,
+          title: j.title,
+          snippet: `${j.salary} | ${j.company}`,
+          source: 'liepin',
+          direction: directionInfo.direction,
+          direction_confidence: directionInfo.confidence,
+          enterprise: j.company,
+          enterprise_type: enterpriseInfo.type,
+          enterprise_type_confidence: enterpriseInfo.confidence,
+          job_level: jobLevelInfo.level || jobLevel || '未标注',
+          job_level_confidence: jobLevelInfo.confidence,
+          job_level_evidence: jobLevelInfo.evidence,
+          freshness: freshnessInfo.status,
+          freshness_evidence: freshnessInfo.evidence,
+          validation_status: 'valid',
+          validation_evidence: `猎聘搜索结果`,
+          detected_at: new Date().toISOString()
+        })
+      }
+      console.log(`[JobBoard] ✓ 猎聘提取到 ${liepinFilteredCount} 条 (${city || '全部'}城市)`)
+      await liepinPage.close()
+    } catch (e) {
+      console.log(`[JobBoard] 猎聘提取失败: ${e.message}`)
+      failedSearches.push({ site: '猎聘', error: e.message })
+    }
+
+    // ========== 前程无忧 (反爬增强版) ==========
+    try {
+      console.log(`[JobBoard] 正在从 前程无忧提取岗位 (城市: ${city || '全部'})...`)
+      const job51Page = await browser.newPage({
+        locale: 'zh-CN',
+        viewport: { width: 1920 + Math.floor(Math.random() * 200), height: 1080 + Math.floor(Math.random() * 200) },
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+      })
+
+      const job51CityCode = job51CityMap[city] || '040000'
+      const job51Query = encodeURIComponent(direction || keywords)
+      const job51Url = `https://search.51job.com/list/${job51CityCode},000000,0000,00,9,99,${job51Query},2,1.html`
+      
+      console.log(`[JobBoard] 前程无忧 URL: ${job51Url}`)
+      
+      await stealthNavigate(job51Page, job51Url, 45000)
+
+      const job51RawJobs = await job51Page.evaluate(() => {
+        const results = []
+        const CITY_PATTERN = /(深圳|上海|北京|广州|杭州|成都|武汉|南京|苏州|天津|重庆|西安|郑州|大连|青岛|厦门|宁波|长沙|合肥|福州|济南|哈尔滨|长春|沈阳|石家庄|太原|南昌|昆明|贵阳|南宁|海口|兰州|银川|乌鲁木齐|拉萨)/
+        const SALARY_PATTERN = /(\d+K?-\d+K?·?\d*薪|\d+-\d+千?\/?月?|\d+-\d+万?\/?年?)/
+        const COMPANY_PATTERN = /([^\n]{2,30}公司|[^\n]{2,30}科技|[^\n]{2,30}网络|[^\n]{2,30}信息|[^\n]{2,30}软件|[^\n]{2,30}技术|[^\n]{2,30}电子|[^\n]{2,30}智能|[^\n]{2,30}集团)/
+        
+        // 查找所有职位链接
+        const jobLinks = document.querySelectorAll('a[href*="jobs.51job.com/"], a[href*="/A/"]')
+        
+        for (const link of Array.from(jobLinks).slice(0, 30)) {
+          const title = link.innerText?.trim()?.split(/\s+/)[0] || ''
+          if (!title || title.length < 2) continue
+          
+          // 尝试从父元素提取信息
+          const container = link.closest('li') || link.closest('div') || link.closest('tr') || link.parentElement
+          const parentText = container?.innerText || ''
+          
+          // 提取城市
+          let location = ''
+          const cityMatch = parentText.match(CITY_PATTERN)
+          if (cityMatch) location = cityMatch[1]
+          
+          // 提取公司名称
+          let company = ''
+          const companyMatch = parentText.match(COMPANY_PATTERN)
+          if (companyMatch) company = companyMatch[1]
+          
+          // 提取薪资
+          let salary = ''
+          const salaryMatch = parentText.match(SALARY_PATTERN)
+          if (salaryMatch) salary = salaryMatch[1]
+          
+          if (title && location) {
+            results.push({
+              url: link.href.startsWith('http') ? link.href : `https:${link.href}`,
+              title,
+              company,
+              salary,
+              location,
+              snippet: `${salary} | ${company} | ${location}`,
+              source: '51job'
+            })
+          }
+        }
+        
+        return results.filter(j => j.url && j.title && j.url.length > 20 && !j.url.includes('javascript'))
+      })
+
+      console.log(`[JobBoard] 前程无忧原始抓取: ${job51RawJobs.length} 条`)
+
+      let job51FilteredCount = 0
+      for (const j of job51RawJobs) {
+        if (!filterByCity(j.location)) continue
+        
+        job51FilteredCount++
+        const jobLevelInfo = detectJobLevel(j.title, j.snippet || '', [])
+        const enterpriseInfo = detectEnterpriseType(j.company)
+        const directionInfo = detectDirection(j.title, j.snippet || '', direction)
+        const freshnessInfo = detectFreshness()
+
+        allJobs.push({
+          url: j.url,
+          title: j.title,
+          snippet: j.title,
+          source: '51job',
+          direction: directionInfo.direction,
+          direction_confidence: directionInfo.confidence,
+          enterprise: j.company,
+          enterprise_type: enterpriseInfo.type,
+          enterprise_type_confidence: enterpriseInfo.confidence,
+          job_level: jobLevelInfo.level || jobLevel || '未标注',
+          job_level_confidence: jobLevelInfo.confidence,
+          job_level_evidence: jobLevelInfo.evidence,
+          freshness: freshnessInfo.status,
+          freshness_evidence: freshnessInfo.evidence,
+          validation_status: 'valid',
+          validation_evidence: `前程无忧搜索结果`,
+          detected_at: new Date().toISOString()
+        })
+      }
+      console.log(`[JobBoard] ✓ 前程无忧提取到 ${job51FilteredCount} 条 (${city || '全部'}城市)`)
+      await job51Page.close()
+    } catch (e) {
+      console.log(`[JobBoard] 前程无忧提取失败: ${e.message}`)
+      failedSearches.push({ site: '前程无忧', error: e.message })
+    }
+
+    // ========== 智联招聘 (反爬增强版) ==========
+    try {
+      console.log(`[JobBoard] 正在从 智联招聘提取岗位 (城市: ${city || '全部'})...`)
+      const zlPage = await browser.newPage({
+        locale: 'zh-CN',
+        viewport: { width: 1920 + Math.floor(Math.random() * 200), height: 1080 + Math.floor(Math.random() * 200) },
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+      })
+
+      const zlCityCode = zlCityMap[city] || ''
+      const zlQuery = encodeURIComponent(direction || keywords)
+      let zlUrl = `https://sou.zhaopin.com/?kw=${zlQuery}`
+      if (zlCityCode) zlUrl += `&jl=${zlCityCode}`
+      
+      console.log(`[JobBoard] 智联招聘 URL: ${zlUrl}`)
+      
+      await stealthNavigate(zlPage, zlUrl, 45000)
+
+      const zlRawJobs = await zlPage.evaluate(() => {
+        const results = []
+        const CITY_PATTERN = /(深圳|上海|北京|广州|杭州|成都|武汉|南京|苏州|天津|重庆|西安|郑州|大连|青岛|厦门|宁波|长沙|合肥|福州|济南|哈尔滨|长春|沈阳|石家庄|太原|南昌|昆明|贵阳|南宁|海口|兰州|银川|乌鲁木齐|拉萨)/
+        const SALARY_PATTERN = /(\d+K?-\d+K?·?\d*薪|\d+-\d+千?\/?月?|\d+-\d+万?\/?年?|\d+-\d+K)/
+        const COMPANY_PATTERN = /([^\n]{2,30}公司|[^\n]{2,30}科技|[^\n]{2,30}网络|[^\n]{2,30}信息|[^\n]{2,30}软件|[^\n]{2,30}技术|[^\n]{2,30}电子|[^\n]{2,30}智能|[^\n]{2,30}集团)/
+        
+        // 查找所有职位链接
+        const jobLinks = document.querySelectorAll('a[href*="jobdetail"], a[href*="/jobdetail/"]')
+        
+        for (const link of Array.from(jobLinks).slice(0, 30)) {
+          const title = link.innerText?.trim() || ''
+          if (!title || title.length < 2) continue
+          
+          // 尝试从父元素提取信息
+          const container = link.closest('div[class*="job"], div[class*="item"], li') || link.closest('div') || link.parentElement
+          const parentText = container?.innerText || ''
+          
+          // 提取城市
+          let location = ''
+          const cityMatch = parentText.match(CITY_PATTERN)
+          if (cityMatch) location = cityMatch[1]
+          
+          // 提取公司名称
+          let company = ''
+          const companyMatch = parentText.match(COMPANY_PATTERN)
+          if (companyMatch) company = companyMatch[1]
+          
+          // 提取薪资
+          let salary = ''
+          const salaryMatch = parentText.match(SALARY_PATTERN)
+          if (salaryMatch) salary = salaryMatch[1]
+          
+          if (title && location) {
+            results.push({
+              url: link.href,
+              title,
+              company,
+              salary,
+              location,
+              snippet: `${salary} | ${company} | ${location}`,
+              source: 'zhaopin'
+            })
+          }
+        }
+        
+        return results.filter(j => j.url && j.title && (j.url.includes('zhaopin') || j.url.includes('jobdetail')))
+      })
+
+      console.log(`[JobBoard] 智联招聘原始抓取: ${zlRawJobs.length} 条`)
+
+      let zlFilteredCount = 0
+      for (const j of zlRawJobs) {
+        if (!filterByCity(j.location)) continue
+        
+        zlFilteredCount++
+        const jobLevelInfo = detectJobLevel(j.title, j.snippet || '', [])
+        const enterpriseInfo = detectEnterpriseType(j.company)
+        const directionInfo = detectDirection(j.title, j.snippet || '', direction)
+        const freshnessInfo = detectFreshness()
+
+        allJobs.push({
+          url: j.url.startsWith('http') ? j.url : `https://sou.zhaopin.com${j.url}`,
+          title: j.title,
+          snippet: j.title,
+          source: 'zhaopin',
+          direction: directionInfo.direction,
+          direction_confidence: directionInfo.confidence,
+          enterprise: j.company,
+          enterprise_type: enterpriseInfo.type,
+          enterprise_type_confidence: enterpriseInfo.confidence,
+          job_level: jobLevelInfo.level || jobLevel || '未标注',
+          job_level_confidence: jobLevelInfo.confidence,
+          job_level_evidence: jobLevelInfo.evidence,
+          freshness: freshnessInfo.status,
+          freshness_evidence: freshnessInfo.evidence,
+          validation_status: 'valid',
+          validation_evidence: `智联招聘搜索结果`,
+          detected_at: new Date().toISOString()
+        })
+      }
+      console.log(`[JobBoard] ✓ 智联招聘提取到 ${zlFilteredCount} 条 (${city || '全部'}城市)`)
+      await zlPage.close()
+    } catch (e) {
+      console.log(`[JobBoard] 智联招聘提取失败: ${e.message}`)
+      failedSearches.push({ site: '智联招聘', error: e.message })
+    }
+
+    // ========== HTTP API 备用方案（当浏览器抓取全部失败时） ==========
+    if (allJobs.length === 0) {
+      console.log('[JobBoard] ⚠️ 所有浏览器抓取均返回0条，切换到HTTP API备用方案...')
+      
+      const searchKeyword = direction || keywords
+      const encodedKeyword = encodeURIComponent(searchKeyword)
+      const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+      
+      // --- 51job API ---
+      try {
+        console.log('[JobBoard] 尝试通过 前程无忧 API 获取岗位...')
+        const job51ApiUrl = `https://search.51job.com/list/040000,000000,0000,00,9,99,${encodedKeyword},2,1.html`
+        const res51 = await httpGet(job51ApiUrl, {
+          'User-Agent': userAgent,
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'zh-CN,zh;q=0.9',
+        })
+        
+        if (res51.status === 200 && res51.body) {
+          console.log(`[JobBoard] 前程无忧 HTTP响应: ${res51.body.length} 字节`)
+          
+          // 尝试多种数据提取方式
+          let jobs = []
+          
+          // 方式1: __INITIAL_STATE__
+          const stateMatch = res51.body.match(/window\.__INITIAL_STATE__\s*=\s*({[\s\S]*?});\s*<\/script>/)
+          if (stateMatch) {
+            try {
+              const stateData = JSON.parse(stateMatch[1])
+              jobs = stateData?.engine?.searchResult?.job?.items || 
+                     stateData?.resultbody?.job?.items || []
+            } catch (e) { console.log(`[JobBoard] 前程无忧 stateMatch解析失败`) }
+          }
+          
+          // 方式2: 从HTML中提取 job.51job.com 链接和标题
+          if (jobs.length === 0) {
+            const jobLinks = res51.body.match(/href="(https?:\/\/jobs\.51job\.com\/[^"]+\.html)"/g) || []
+            const titleLinks = res51.body.match(/<a[^>]*class="[^"]*jname[^"]*"[^>]*title="([^"]+)"/g) || []
+            console.log(`[JobBoard] 前程无忧 HTML: ${jobLinks.length} 链接, ${titleLinks.length} 标题`)
+            
+            for (let i = 0; i < Math.min(jobLinks.length, 20); i++) {
+              const href = jobLinks[i].match(/href="([^"]+)"/)?.[1] || ''
+              const title = titleLinks[i]?.match(/title="([^"]+)"/)?.[1] || `岗位${i+1}`
+              if (href) {
+                jobs.push({ job_href: href, jobname: title })
+              }
+            }
+          }
+          
+          // 方式3: 提取所有 job.51job.com 链接（最宽泛匹配）
+          if (jobs.length === 0) {
+            const wideLinks = res51.body.match(/https?:\/\/jobs\.51job\.com\/[^"'<>\s]+/g) || []
+            const uniqueLinks = [...new Set(wideLinks)]
+            console.log(`[JobBoard] 前程无忧 宽泛匹配: ${uniqueLinks.length} 个唯一链接`)
+            for (let i = 0; i < Math.min(uniqueLinks.length, 20); i++) {
+              jobs.push({ job_href: uniqueLinks[i], jobname: `岗位${i+1}` })
+            }
+          }
+          
+          console.log(`[JobBoard] 前程无忧 最终提取: ${jobs.length} 条`)
+          for (const j of jobs) {
+            if (!filterByCity(j.workarea_text)) continue
+            allJobs.push({
+              url: j.job_href || '',
+              title: j.jobname || '',
+              snippet: `${j.providesalary_text || ''} | ${j.companyname || ''}`,
+              source: '51job',
+              direction: searchKeyword,
+              direction_confidence: 0.80,
+              enterprise: j.companyname || '未明确',
+              enterprise_type: '未分类',
+              enterprise_type_confidence: 0.30,
+              job_level: jobLevel || '未标注',
+              job_level_confidence: 0.30,
+              job_level_evidence: ['来源: 前程无忧'],
+              freshness: 'recent',
+              freshness_evidence: ['搜索数据'],
+              validation_status: 'probably_valid',
+              validation_evidence: '前程无忧搜索结果',
+              detected_at: new Date().toISOString()
+            })
+          }
+        }
+      } catch (e) {
+        console.log(`[JobBoard] 前程无忧API抓取失败: ${e.message}`)
+      }
+      
+      // --- 智联招聘 API ---
+      try {
+        console.log('[JobBoard] 尝试通过 智联招聘 API 获取岗位...')
+        const zlCityCode = zlCityMap[city] || ''
+        // Try multiple API endpoints
+        const zlApiUrls = [
+          `https://fe-api.zhaopin.com/c/i/sou?pageSize=30&cityId=${zlCityCode}&kw=${encodedKeyword}&kt=3&at=5895d1d9437a4201b0260447c229c917&rt=504b697e3e2e4562b96b52ea4430b425`,
+          `https://fe-api.zhaopin.com/c/i/sou?pageSize=30&cityId=${zlCityCode}&kw=${encodedKeyword}&kt=3`,
+        ]
+        
+        for (const zlApiUrl of zlApiUrls) {
+          const zlRes = await httpGet(zlApiUrl, {
+            'User-Agent': userAgent,
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'zh-CN,zh;q=0.9',
+          })
+          
+          if (zlRes.status === 200 && zlRes.body) {
+            try {
+              const zlData = JSON.parse(zlRes.body)
+              console.log(`[JobBoard] 智联招聘 API响应: code=${zlData.code}, message=${zlData.message || ''}`)
+              const jobs = zlData?.data?.results || []
+              console.log(`[JobBoard] 智联招聘 API 返回 ${jobs.length} 条`)
+              if (jobs.length > 0) {
+                for (const j of jobs) {
+                  if (!filterByCity(j.city?.display || '')) continue
+                  allJobs.push({
+                    url: j.positionURL || '',
+                    title: j.jobName || '',
+                    snippet: `${j.salary || ''} | ${j.company?.name || ''}`,
+                    source: 'zhaopin',
+                    direction: searchKeyword,
+                    direction_confidence: 0.80,
+                    enterprise: j.company?.name || '未明确',
+                    enterprise_type: '未分类',
+                    enterprise_type_confidence: 0.30,
+                    job_level: jobLevel || '未标注',
+                    job_level_confidence: 0.30,
+                    job_level_evidence: ['来源: 智联招聘API'],
+                    freshness: 'recent',
+                    freshness_evidence: ['API实时数据'],
+                    validation_status: 'probably_valid',
+                    validation_evidence: '智联招聘API返回',
+                    detected_at: new Date().toISOString()
+                  })
+                }
+                break // Found results, no need to try other URLs
+              }
+            } catch (e) {
+              console.log(`[JobBoard] 智联招聘 JSON解析失败: ${e.message}`)
+            }
+          }
+        }
+      } catch (e) {
+        console.log(`[JobBoard] 智联招聘API抓取失败: ${e.message}`)
+      }
+      
+      // --- 猎聘 API ---
+      try {
+        console.log('[JobBoard] 尝试通过 猎聘 API 获取岗位...')
+        const liepinCityCode = liepinCityMap[city] || ''
+        const liepinApiUrl = `https://www.liepin.com/api/relatedposition/?querykey=${encodedKeyword}&dqs=${liepinCityCode}&pageSize=30`
+        const lpRes = await httpGet(liepinApiUrl, {
+          'User-Agent': userAgent,
+          'Accept': 'application/json, text/plain, */*',
+          'Accept-Language': 'zh-CN,zh;q=0.9',
+          'Referer': 'https://www.liepin.com/zhaopin/',
+        })
+        
+        if (lpRes.status === 200 && lpRes.body) {
+          try {
+            const lpData = JSON.parse(lpRes.body)
+            const jobs = lpData?.data?.positionList || lpData?.data?.jobs || []
+            console.log(`[JobBoard] 猎聘 API 返回 ${jobs.length} 条`)
+            for (const j of jobs) {
+              allJobs.push({
+                url: j.jobURL || j.url || '',
+                title: j.jobName || j.title || '',
+                snippet: `${j.salary || ''} | ${j.companyName || ''}`,
+                source: 'liepin',
+                direction: searchKeyword,
+                direction_confidence: 0.80,
+                enterprise: j.companyName || '未明确',
+                enterprise_type: '未分类',
+                enterprise_type_confidence: 0.30,
+                job_level: jobLevel || '未标注',
+                job_level_confidence: 0.30,
+                job_level_evidence: ['来源: 猎聘API'],
+                freshness: 'recent',
+                freshness_evidence: ['API实时数据'],
+                validation_status: 'probably_valid',
+                validation_evidence: '猎聘API返回',
+                detected_at: new Date().toISOString()
+              })
+            }
+          } catch (e) {
+            console.log(`[JobBoard] 猎聘 JSON解析失败: ${e.message}`)
+          }
+        }
+      } catch (e) {
+        console.log(`[JobBoard] 猎聘API抓取失败: ${e.message}`)
+      }
+    }
+
+  } catch (error) {
+    console.log(`[JobBoard] 抓取异常: ${error.message}`)
+    failedSearches.push({ site: '全局', error: error.message })
+  } finally {
+    if (browser) await browser.close()
+  }
+
+  // 去重（按 URL）
+  const seen = new Set()
+  const uniqueJobs = []
+  for (const job of allJobs) {
+    if (!seen.has(job.url)) {
+      seen.add(job.url)
+      uniqueJobs.push(job)
+    }
+  }
+
+  const searchTime = new Date().toISOString()
+
+  // 按 job_level 分类
+  const byJobLevel = {}
+  for (let i = 0; i < uniqueJobs.length; i++) {
+    const level = uniqueJobs[i].job_level || '未标注'
+    if (!byJobLevel[level]) {
+      byJobLevel[level] = { count: 0, jobs: [] }
+    }
+    byJobLevel[level].count++
+    byJobLevel[level].jobs.push(i)
+  }
+
+  // 按 enterprise_type 分类
+  const byEnterpriseType = {}
+  for (let i = 0; i < uniqueJobs.length; i++) {
+    const etype = uniqueJobs[i].enterprise_type || '未分类'
+    if (!byEnterpriseType[etype]) {
+      byEnterpriseType[etype] = { count: 0, enterprises: [] }
+    }
+    const enterpriseName = uniqueJobs[i].enterprise
+    const existingEnt = byEnterpriseType[etype].enterprises.find(e => e.name === enterpriseName)
+    if (existingEnt) {
+      existingEnt.jobs.push(i)
+    } else {
+      byEnterpriseType[etype].enterprises.push({ name: enterpriseName, jobs: [i] })
+    }
+    byEnterpriseType[etype].count++
+  }
+
+  // 按 freshness 分类
+  const byFreshness = { new: { count: 0, jobs: [] }, recent: { count: 0, jobs: [] }, unknown: { count: 0, jobs: [] }, stale: { count: 0, jobs: [] } }
+  for (let i = 0; i < uniqueJobs.length; i++) {
+    const fresh = uniqueJobs[i].freshness || 'unknown'
+    if (byFreshness[fresh]) {
+      byFreshness[fresh].count++
+      byFreshness[fresh].jobs.push(i)
+    }
+  }
+
+  // 按 source 统计
+  const bySource = {}
+  for (const job of uniqueJobs) {
+    bySource[job.source] = (bySource[job.source] || 0) + 1
+  }
+
+  // 交叉表：enterprise_type × job_level
+  const crossTable = {}
+  const jobLevels = ['实习', '校招/应届', '初级（1-3年）', '中级（3-5年）', '高级/资深']
+  const entTypes = Object.keys(byEnterpriseType)
+  for (const et of entTypes) {
+    crossTable[et] = {}
+    for (const jl of jobLevels) {
+      crossTable[et][jl] = 0
+    }
+  }
+  for (const job of uniqueJobs) {
+    const et = job.enterprise_type || '未分类'
+    const jl = job.job_level || '未标注'
+    if (crossTable[et] && crossTable[et][jl] !== undefined) {
+      crossTable[et][jl]++
+    }
+  }
+
+  let validCount = 0, probablyValidCount = 0, expiredCount = 0
+  for (const job of uniqueJobs) {
+    if (job.validation_status === 'valid') validCount++
+    else if (job.validation_status === 'probably_valid') probablyValidCount++
+    else if (job.validation_status === 'expired') expiredCount++
+  }
+
+  const reviewQueue = []
+  for (let i = 0; i < uniqueJobs.length; i++) {
+    if (uniqueJobs[i].job_level_confidence < 0.5 || uniqueJobs[i].enterprise_type_confidence < 0.5) {
+      reviewQueue.push({
+        reason: 'job_level_confidence < 0.5 或企业类型不明确',
+        count: 1,
+        jobs: [i]
+      })
+    }
+  }
+
+  const sourceNames = { zhipin: 'BOSS直聘', liepin: '猎聘', '51job': '前程无忧', zhaopin: '智联招聘', lagou: '拉勾' }
+  const sourceList = Object.entries(bySource).map(([k, v]) => sourceNames[k] || k).join('、')
+
+  const bestOpportunities = uniqueJobs.filter(j => j.validation_status === 'valid').slice(0, 3).map(j => `${j.title}（${j.enterprise}）`).join('、') || '暂无'
+
+  const result = {
+    search_time: searchTime,
+    method: 'search_engine',
+    city: city || '全国',
+    direction: direction || keywords,
+    total_urls: allJobs.length,
+    deduped_urls: uniqueJobs.length,
+
+    summary: {
+      human_readable: `本次搜索覆盖 ${sourceList} ${Object.keys(bySource).length} 个站点，围绕「${city || '全国'} + ${direction || keywords}」进行了定向搜索。共提取 ${allJobs.length} 条职位 URL（已按城市过滤），去重后 ${uniqueJobs.length} 条；其中 ${validCount} 条验证有效，${probablyValidCount} 条疑似有效，验证通过率 ${Math.round((validCount + probablyValidCount) / Math.max(uniqueJobs.length, 1) * 100)}%。`,
+      best_opportunity: bestOpportunities,
+      risk_note: `部分链接需人工确认有效性；建议优先查看 validation_status 为 valid 的岗位。当前筛选城市: ${city || '全部'}`
+    },
+
+    jobs: uniqueJobs,
+
+    by_job_level: byJobLevel,
+    by_enterprise_type: byEnterpriseType,
+    freshness: byFreshness,
+    by_source: bySource,
+
+    cross_table: {
+      description: '企业性质 × 职位层级 交叉表',
+      ...crossTable
+    },
+
+    validation: {
+      total_extracted: allJobs.length,
+      deduped: uniqueJobs.length,
+      valid: validCount,
+      probably_valid: probablyValidCount,
+      expired: expiredCount,
+      blocked: 0,
+      dead: 0,
+      unverified_low_priority: 0,
+      valid_or_probably_valid_rate: `${Math.round((validCount + probablyValidCount) / Math.max(uniqueJobs.length, 1) * 100)}%`
+    },
+
+    review_queue: reviewQueue,
+    failed_searches: failedSearches,
+    notes: `共发现 ${uniqueJobs.length} 条相关岗位（城市: ${city || '全部'}），建议优先关注 recent 和 valid 状态的岗位。`
+  }
+
+  console.log(`\n[JobBoard] ============================================`)
+  console.log(`[JobBoard] 📊 搜索完成统计:`)
+  console.log(`[JobBoard]    目标城市: ${city || '全部'}`)
+  console.log(`[JobBoard]    总提取: ${allJobs.length} 条 (过滤前)`)
+  console.log(`[JobBoard]    去重后: ${uniqueJobs.length} 条`)
+  console.log(`[JobBoard]    来源分布:`, bySource)
+  console.log(`[JobBoard] ============================================\n`)
+
+  return result
+}
+
+
+
+
+
+
 
 async function discoverCompaniesWithAi(rawKeywords) {
   try {
@@ -5274,6 +6382,139 @@ ${existingContext}
       writeJsonl(DISCOVERY_RUNS_FILE, runs)
       
       return { success: true, data: { ...runRecord, jobs: discoveredJobs } }
+    }
+  },
+  '/api/discovery/ai-search': {
+    POST: async (body) => {
+      const { direction, city, enterpriseType, jobLevel } = body
+      if (!direction?.trim()) {
+        return { success: false, error: '请提供专业方向' }
+      }
+
+      console.log('[AI Search] 开始搜索招聘网站:', { direction, city, enterpriseType, jobLevel })
+
+      const jobFinerResult = await scrapeJobBoardJobs(direction, { direction, city, enterpriseType, jobLevel })
+
+      const discoveredJobs = jobFinerResult.jobs || []
+      console.log('[AI Search] job-finer-result 格式返回:', {
+        total_urls: jobFinerResult.total_urls,
+        deduped_urls: jobFinerResult.deduped_urls,
+        valid: jobFinerResult.validation?.valid,
+        probably_valid: jobFinerResult.validation?.probably_valid,
+        by_source: jobFinerResult.by_source
+      })
+
+      const bingResult = await discoverWebJobs(direction, { direction, city, enterpriseType, jobLevel })
+      const discoveredCompanies = bingResult.companies || []
+      
+      // Merge Bing search jobs into discoveredJobs
+      const bingJobs = bingResult.jobs || []
+      console.log('[AI Search] Bing 搜索返回:', { jobs: bingJobs.length, companies: discoveredCompanies.length })
+      
+      if (bingJobs.length > 0) {
+        for (const bj of bingJobs) {
+          // Convert bing job format to job-finer format
+          discoveredJobs.push({
+            url: bj.url,
+            title: bj.title,
+            snippet: bj.description?.slice(0, 200) || '',
+            source: bj.source_type === 'web_search' ? 'bing' : (bj.source || 'bing'),
+            direction: direction,
+            direction_confidence: 0.70,
+            enterprise: bj.company || bj.title.split(' ')[0] || '未明确',
+            enterprise_type: '未分类',
+            enterprise_type_confidence: 0.30,
+            job_level: jobLevel || '未标注',
+            job_level_confidence: 0.30,
+            job_level_evidence: ['来源: Bing搜索'],
+            freshness: bj.liveness_status === 'active' ? 'recent' : 'unknown',
+            freshness_evidence: [bj.liveness_reason || 'Bing搜索结果'],
+            validation_status: bj.liveness_status === 'active' ? 'valid' : 'probably_valid',
+            validation_evidence: bj.liveness_reason || 'Bing搜索返回',
+            detected_at: bj.discovered_at || new Date().toISOString()
+          })
+        }
+      }
+
+      const jobCompanies = new Set()
+      for (const job of discoveredJobs) {
+        if (job.enterprise && job.enterprise.trim()) {
+          jobCompanies.add(job.enterprise.trim())
+        }
+      }
+
+      for (const companyName of jobCompanies) {
+        if (!discoveredCompanies.find(c => c.name === companyName)) {
+          discoveredCompanies.push(normalizeCompany({
+            name: companyName,
+            official_homepage: '',
+            career_urls: [],
+            keywords: [direction],
+            negative_keywords: ['销售', '财务', '人力', '市场'],
+            enabled: true,
+            source_type: 'job_board',
+            created_at: new Date().toISOString()
+          }))
+        }
+      }
+
+      console.log('[AI Search] 招聘网站搜索结果:', { found: discoveredJobs.length, companies: discoveredCompanies.length })
+
+      const jobs = readJsonl(JOBS_FILE)
+      console.log('[AI Search] 当前 jobs.jsonl 记录数:', jobs.length)
+      let added = 0
+      let duplicates = 0
+
+      let jobIndex = 0
+      for (const job of discoveredJobs) {
+        const exists = jobs.find(j => j.url === job.url)
+        if (!exists) {
+          // 使用递增索引 + URL hash 确保唯一性
+          const uniqueId = `${job.source}-${Buffer.from(job.url).toString('base64').substring(0, 12)}-${Date.now()}-${jobIndex}`
+          jobs.push({
+            id: safeSlug(uniqueId, 'job'),
+            url: job.url,
+            title: job.title,
+            company: job.enterprise,
+            snippet: job.snippet,
+            source: job.source,
+            direction: job.direction,
+            location: job.location || '',
+            salary: job.salary || '',
+            enterprise_type: job.enterprise_type,
+            job_level: job.job_level,
+            liveness_status: job.validation_status || 'probably_valid',
+            created_at: job.detected_at,
+            source_type: 'job_board_search',
+            job_finer_data: job
+          })
+          added++
+          jobIndex++
+        } else {
+          duplicates++
+        }
+      }
+      writeJsonl(JOBS_FILE, jobs)
+      console.log('[AI Search] 新增:', added, '重复:', duplicates, '总计:', jobs.length)
+
+      const companyMerge = mergeCompanyRecords(readCompanies(), discoveredCompanies)
+      if (discoveredCompanies.length) {
+        writeCompanies(companyMerge.companies)
+      }
+
+      return {
+        success: true,
+        data: {
+          ...jobFinerResult,
+          imported: {
+            added,
+            duplicates,
+            total_in_jobs_file: jobs.length
+          },
+          companies_added: companyMerge.added,
+          companies_updated: companyMerge.updated
+        }
+      }
     }
   },
   '/api/discovery/search': {
