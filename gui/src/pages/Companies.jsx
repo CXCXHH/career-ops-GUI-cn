@@ -107,10 +107,15 @@ export default function Companies({ onToast }) {
   }
 
   const handleSelectAll = () => {
-    if (selectedIds.size === filteredCompanies.length) {
-      setSelectedIds(new Set())
+    const allSelected = filteredCompanies.length > 0 && filteredCompanies.every(c => selectedIds.has(c.id))
+    if (allSelected) {
+      const newSelected = new Set(selectedIds)
+      filteredCompanies.forEach(c => newSelected.delete(c.id))
+      setSelectedIds(newSelected)
     } else {
-      setSelectedIds(new Set(filteredCompanies.map(c => c.id)))
+      const newSelected = new Set(selectedIds)
+      filteredCompanies.forEach(c => newSelected.add(c.id))
+      setSelectedIds(newSelected)
     }
   }
 
