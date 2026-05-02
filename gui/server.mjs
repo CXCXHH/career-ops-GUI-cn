@@ -976,6 +976,14 @@ function extractJsonObject(text) {
   return parsed
 }
 
+function extractJsonArray(text) {
+  const parsed = extractJsonValue(text)
+  if (!Array.isArray(parsed)) {
+    throw new Error('AI response did not contain a JSON array')
+  }
+  return parsed
+}
+
 function extractJsonValue(text) {
   const trimmed = String(text || '').trim()
   if (!trimmed) throw new Error('AI response is empty')
@@ -5036,6 +5044,40 @@ const routes = {
       return { success: true, data: { ...evaluation, reportPath } }
     }
   },
+  '/api/resume/generate': {
+    POST: async (body) => {
+      const targetJobId = body.targetJobId
+      const targetCompany = body.targetCompany
+      const targetRole = body.targetRole
+      const provider = body.provider || process.env.AI_RESUME_PROVIDER || process.env.AI_EVAL_PROVIDER || 'deepseek'
+
+      // 尝试通过 job ID 找到岗位
+      let job = null
+      if (targetJobId) {
+        const jobs = readJsonl(JOBS_FILE)
+        job = jobs.find(j => j.id === targetJobId) || null
+      }
+
+      // 如果没有找到 job，但提供了公司和岗位名称，构造一个临时 job 对象
+      if (!job && (targetCompany || targetRole)) {
+        job = {
+          company: targetCompany || '',
+          title: targetRole || '',
+          url: '',
+          description: '',
+          raw_text: ''
+        }
+      }
+
+      if (!job) {
+        return { success: false, error: '未找到目标岗位信息' }
+      }
+
+      const profile = getResumeProfile()
+      const resume = await buildTailoredResume(job, profile, provider)
+      return { success: true, data: resume }
+    }
+  },
   '/api/jobs/:id/resume/pdf': {
     POST: async (body, params) => {
       const jobs = readJsonl(JOBS_FILE)
@@ -5097,6 +5139,55 @@ const routes = {
     DELETE: async () => {
       const profile = deleteResumePhoto()
       return { success: true, data: profile }
+    }
+  },
+  '/api/resume/auto-fill': {
+    POST: async (body) => {
+      const { provider, section, userInput } = body || {}
+      if (!section || !userInput) {
+        return { success: false, error: '缺少必要参数：section 和 userInput' }
+      }
+      const validSections = ['education', 'experience', 'projects', 'skills']
+      if (!validSections.includes(section)) {
+        return { success: false, error: `不支持的 section: ${section}，可选值：${validSections.join(', ')}` }
+      }
+      const sectionPrompt = {
+        education: `请根据以下用户输入的教育经历描述，提取并生成结构化的教育经历数据。返回一个数组，每个元素包含：school(学校名称)、degree(学历)、major(专业)、start_date(开始时间YYYY-MM格式)、end_date(结束时间YYYY-MM格式)、gpa(GPA成绩)、description(主修课程/获奖情况)。如果时间信息不完整，请尽量推断合理的时间。只返回JSON数组。`,
+        experience: `请根据以下用户输入的工作/实习经历描述，提取并生成结构化的工作经历数据。返回一个数组，每个元素包含：company(公司名称)、position(职位)、start_date(开始时间YYYY-MM格式)、end_date(结束时间YYYY-MM格式，如果至今请填"present")、description(工作描述)、role(项目分工)。如果时间信息不完整，请尽量推断合理的时间。只返回JSON数组。`,
+        projects: `请根据以下用户输入的项目经历描述，提取并生成结构化的项目经历数据。返回一个数组，每个元素包含：name(项目名称)、role(项目角色)、start_date(开始时间YYYY-MM格式)、end_date(结束时间YYYY-MM格式)、description(项目描述)、tech_stack(技术栈)。如果时间信息不完整，请尽量推断合理的时间。只返回JSON数组。`,
+        skills: `请根据以下用户输入的技能描述，提取并生成一个技能关键词数组。只返回JSON数组。`
+      }
+      const profile = getResumeProfile()
+      const existingContext = `
+当前已有数据：
+- 教育经历：${JSON.stringify(profile.education || [])}
+- 工作/实习经历：${JSON.stringify(profile.experience || [])}
+- 项目经历：${JSON.stringify(profile.projects || [])}
+- 技能：${profile.skills || '无'}
+用户新输入的内容：${userInput}
+请合并已有数据和新输入的内容，返回更新后的完整数据。不要删除已有数据，只追加或合并新数据。`
+      const prompt = `${sectionPrompt[section]}
+${existingContext}
+返回格式：${section === 'skills' ? '["技能1", "技能2"]' : JSON.stringify(section === 'education' ? [{ school: '', degree: '', major: '', start_date: '', end_date: '', gpa: '', description: '' }] : section === 'experience' ? [{ company: '', position: '', start_date: '', end_date: '', description: '', role: '' }] : [{ name: '', role: '', start_date: '', end_date: '', description: '', tech_stack: '' }])}`
+      try {
+        const response = await callChatCompletions(provider, prompt, {
+          systemPrompt: '你是一个严格输出 JSON 的数据提取器。请根据用户输入提取结构化数据，只返回JSON，不要任何其他文字。',
+          temperature: 0.3,
+          maxTokens: 4000
+        })
+        const parsed = extractJsonArray(response.content)
+        return {
+          success: true,
+          data: {
+            section,
+            result: parsed,
+            provider: response.provider,
+            model: response.model
+          }
+        }
+      } catch (error) {
+        return { success: false, error: `AI 补全失败：${error.message}` }
+      }
     }
   },
   '/api/jobs/:id/tracker-addition': {
