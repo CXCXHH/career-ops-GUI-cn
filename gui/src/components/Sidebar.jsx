@@ -1,19 +1,15 @@
 import { useState } from 'react'
-import { LayoutDashboard, Building2, Search, FileText, File, ListTodo, Briefcase, Bell, Inbox, Settings, ClipboardList, Megaphone } from 'lucide-react'
+import { LayoutDashboard, Building2, Search, File, ListTodo, Briefcase, Settings, Megaphone } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import AnnouncementModal from './AnnouncementModal'
 
 const navItems = [
   { path: '/', icon: LayoutDashboard, label: '工作台' },
-  { path: '/onboarding', icon: ClipboardList, label: '首次使用' },
-  { path: '/discovery', icon: Search, label: '岗位发现' },
-  { path: '/jobs', icon: FileText, label: '岗位列表' },
-  { path: '/resume', icon: File, label: '简历生成' },
-  { path: '/tracker', icon: ListTodo, label: '投递追踪' },
-  { path: '/interview', icon: Briefcase, label: '面试准备' },
-  { path: '/followups', icon: Bell, label: '跟进提醒' },
-  { path: '/candidates', icon: Inbox, label: '候选区' },
-  { path: '/companies', icon: Building2, label: '公司库' },
+  { path: '/resume', icon: File, label: '简历' },
+  { path: '/jobs', icon: Search, label: '岗位' },
+  { path: '/tracker', icon: ListTodo, label: '投递' },
+  { path: '/interview', icon: Briefcase, label: '面试' },
+  { path: '/companies', icon: Building2, label: '公司' },
   { path: '/settings', icon: Settings, label: '设置' }
 ]
 

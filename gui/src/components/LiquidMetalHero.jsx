@@ -341,7 +341,7 @@ export default function LiquidMetalHero() {
         </h1>
 
         <p ref={subtitleRef} className="liquid-hero-subtitle">
-          从岗位发现、AI 智能评分、简历生成到投递追踪
+          从搜索岗位、AI 智能评分、简历生成到投递追踪
           <br />
           一站式管理你的整个求职流程
         </p>

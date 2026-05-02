@@ -636,6 +636,92 @@ function AiAutoFillModal({ isOpen, onClose, section, onFill, onToast }) {
   )
 }
 
+function BulkImportModal({ isOpen, onClose, providers, selectedProvider, onProviderChange, onImport, onToast }) {
+  const [inputText, setInputText] = useState('')
+  const [isImporting, setIsImporting] = useState(false)
+
+  const handleImport = async () => {
+    if (!inputText.trim()) {
+      showToast(onToast, '请粘贴要导入的资料内容', 'error')
+      return
+    }
+    setIsImporting(true)
+    try {
+      await onImport({ provider: selectedProvider, userInput: inputText.trim() })
+      showToast(onToast, '资料导入成功', 'success')
+      onClose()
+      setInputText('')
+    } catch (error) {
+      showToast(onToast, error?.response?.data?.error || error?.message || '导入失败', 'error')
+    } finally {
+      setIsImporting(false)
+    }
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999,
+      background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center'
+    }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: 'var(--bg-primary)', borderRadius: '20px', padding: '32px',
+        maxWidth: '640px', width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+          <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Sparkle size={20} style={{ color: 'var(--primary-color)' }} />
+            AI 批量导入资料
+          </h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', borderRadius: '8px' }}>
+            <X size={20} style={{ color: 'var(--text-muted)' }} />
+          </button>
+        </div>
+
+        <div style={{
+          background: 'var(--haze-blue-50)', borderRadius: '12px', padding: '12px 16px',
+          marginBottom: '16px', fontSize: '13px', color: 'var(--haze-blue-800)', display: 'flex', gap: '8px', alignItems: 'flex-start'
+        }}>
+          <Warning size={16} style={{ flexShrink: 0, marginTop: '1px' }} />
+          <div>粘贴旧简历、项目描述或任意非结构化文本，AI 会自动提取结构化数据并与已有内容合并。不会覆盖已有数据，只补充新增内容。</div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px', marginBottom: '16px' }}>
+          <div className="form-item" style={{ marginBottom: 0 }}>
+            <label style={{ fontSize: '13px', fontWeight: 500 }}>AI 模型</label>
+            <select value={selectedProvider} onChange={(e) => onProviderChange(e.target.value)} className="form-control">
+              {providers.map(p => (
+                <option key={p.id} value={p.id} disabled={!p.configured}>
+                  {p.label} {p.configured ? `(${p.model})` : '(未配置 Key)'}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <textarea
+          className="form-control"
+          rows={12}
+          value={inputText}
+          onChange={(e) => setInputText(e.target.value)}
+          placeholder={`粘贴你的资料内容，例如：\n\n# 姓名\n某大学 某专业 本科 2023-2027\n\n项目经历：\n1. XXX项目 - 使用Python做数据分析...\n2. XXX项目 - ...\n\n实习经历：\n在XX公司担任XX岗位...\n\n技能：Python, R, SQL...`}
+          style={{ resize: 'vertical', fontSize: '14px', lineHeight: '1.7' }}
+        />
+
+        <div style={{ display: 'flex', gap: '12px', marginTop: '16px', justifyContent: 'flex-end' }}>
+          <button className="btn btn-secondary" onClick={onClose} disabled={isImporting}>取消</button>
+          <button className="btn btn-primary" onClick={handleImport} disabled={isImporting || !inputText.trim()}>
+            <Sparkle size={16} style={{ marginRight: '6px' }} />
+            {isImporting ? 'AI 提取中...' : '开始导入'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function PreviewModal({ profile, education, experience, projects, modules, photoPreview, onClose }) {
   const asText = (value) => {
     if (Array.isArray(value)) return value.map(item => String(item || '').trim()).filter(Boolean).join('、')
@@ -716,10 +802,13 @@ function PreviewModal({ profile, education, experience, projects, modules, photo
 
   const renderModule = (mod) => {
     if (mod.type === 'custom' && mod.content) {
+      const lines = renderBulletLines(mod.content)
       return (
         <section key={mod.id} style={{ marginBottom: '16px' }}>
           {renderSectionTitle(mod.name)}
-          <p style={{ fontSize: '13px', lineHeight: '1.7', color: 'var(--text-primary)', whiteSpace: 'pre-line' }}>{mod.content}</p>
+          {lines.map((line, idx) => (
+            <div key={idx} style={{ marginBottom: '4px', fontSize: '13px', color: 'var(--text-primary)' }}>{line}</div>
+          ))}
         </section>
       )
     }
@@ -920,6 +1009,28 @@ export default function ResumeBuilder({ onToast }) {
   })
   const [validationErrors, setValidationErrors] = useState({})
   const [aiModal, setAiModal] = useState({ open: false, section: '' })
+  const [bulkImportOpen, setBulkImportOpen] = useState(false)
+  const [bulkImportText, setBulkImportText] = useState('')
+  const [isBulkImporting, setIsBulkImporting] = useState(false)
+
+  const triggerBulkImport = async () => {
+    if (!bulkImportText.trim()) { showToast(onToast, '请先粘贴要导入的资料内容', 'error'); return }
+    setIsBulkImporting(true)
+    try {
+      const res = await resumeAPI.bulkImport({ provider: selectedProvider, userInput: bulkImportText.trim() })
+      const saved = res.data
+      setProfile(saved)
+      if (saved.education && Array.isArray(saved.education)) setEducation(saved.education)
+      if (saved.experience && Array.isArray(saved.experience)) setExperience(saved.experience)
+      if (saved.projects && Array.isArray(saved.projects)) setProjects(saved.projects)
+      fetchModules()
+      setBulkImportText('')
+      showToast(onToast, '资料导入成功', 'success')
+    } catch (error) {
+      showToast(onToast, error?.response?.data?.error || error?.message || '导入失败', 'error')
+    } finally { setIsBulkImporting(false) }
+  }
+
   const basicPhotoSrc = resolvePhotoSrc(profile, photoPreview)
 
   useEffect(() => {
@@ -1094,8 +1205,18 @@ export default function ResumeBuilder({ onToast }) {
       case 'education': return handleAiFillEducation
       case 'experience': return handleAiFillExperience
       case 'projects': return handleAiFillProjects
-      default: return () => {}
+      default: return () => { }
     }
+  }
+
+  const handleBulkImport = async (params) => {
+    const res = await resumeAPI.bulkImport(params)
+    const data = res.data || {}
+    setProfile(data)
+    if (Array.isArray(data.education)) setEducation(data.education)
+    if (Array.isArray(data.experience)) setExperience(data.experience)
+    if (Array.isArray(data.projects)) setProjects(data.projects)
+    fetchModules()
   }
 
   const validateBasicInfo = () => {
@@ -1362,7 +1483,86 @@ export default function ResumeBuilder({ onToast }) {
 
   return (
     <PageTransition>
-      <LiquidSectionHeader title="简历生成" subtitle="填写个人信息，根据岗位要求生成定制化简历" icon={FileText} />
+      <LiquidSectionHeader title="简历" subtitle="AI 驱动 — 粘贴资料自动提取，逐项检查后生成 PDF" icon={FileText} />
+
+      {/* ── AI 导入 ── */}
+      <ScrollReveal>
+        <LiquidCard>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+            <div style={{
+              width: '40px', height: '40px', borderRadius: '12px',
+              background: 'linear-gradient(135deg, var(--primary-color), #6366f1)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <Sparkle size={22} color="#fff" weight="fill" />
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>AI 导入资料</h3>
+              <p style={{ margin: '2px 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>粘贴旧简历或项目描述，AI 自动提取结构化数据并与已有内容合并。不覆盖已有数据。</p>
+            </div>
+          </div>
+          <textarea
+            value={bulkImportText}
+            onChange={e => setBulkImportText(e.target.value)}
+            placeholder="在此粘贴你的资料...&#10;&#10;可以是旧简历、项目描述、技能列表、获奖记录、工作经历等任意文本。&#10;AI 会自动识别内容类型并提取结构化数据。"
+            rows={8}
+            className="form-control"
+            style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', fontSize: '14px', lineHeight: '1.7', marginBottom: '12px' }}
+          />
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <select value={selectedProvider} onChange={e => setSelectedProvider(e.target.value)} className="form-control" style={{ width: '200px', fontSize: '13px' }}>
+                {providers.length === 0 && <option value="deepseek">DeepSeek</option>}
+                {providers.map(p => (
+                  <option key={p.id} value={p.id} disabled={!p.configured}>{p.label}{p.configured ? ` (${p.model})` : ' (未配置 Key)'}</option>
+                ))}
+              </select>
+            </div>
+            <MagneticButton variant="primary" onClick={triggerBulkImport} disabled={isBulkImporting || !bulkImportText.trim()}>
+              {isBulkImporting ? (
+                <><div className="liquid-spinner" style={{ width: '16px', height: '16px', marginRight: '6px', borderWidth: '2px' }} />AI 提取中...</>
+              ) : (
+                <><Upload size={16} style={{ marginRight: '6px' }} />开始导入</>
+              )}
+            </MagneticButton>
+          </div>
+        </LiquidCard>
+      </ScrollReveal>
+
+      {/* ── 资料概览 ── */}
+      <ScrollReveal delay={0.08}>
+        <LiquidCard>
+          <div className="card-header">
+            <div className="card-title">资料概览</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+            <div style={{
+              padding: '10px 14px', borderRadius: '10px',
+              background: profile.full_name ? 'var(--success-tint)' : 'var(--bg-secondary)',
+              border: `1px solid ${profile.full_name ? 'var(--success-color)' : 'var(--border-color)'}33`
+            }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>基本信息</div>
+              <div style={{ fontSize: '14px', fontWeight: 500 }}>{profile.full_name ? `${profile.full_name} · ${profile.target_role || '未设岗位'}` : '待填写'}</div>
+            </div>
+            <div style={{
+              padding: '10px 14px', borderRadius: '10px',
+              background: (education.length + experience.length + projects.length) > 0 ? 'var(--success-tint)' : 'var(--bg-secondary)',
+              border: `1px solid ${(education.length + experience.length + projects.length) > 0 ? 'var(--success-color)' : 'var(--border-color)'}33`
+            }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>经历</div>
+              <div style={{ fontSize: '14px', fontWeight: 500 }}>{education.length} 教育 · {experience.length} 工作 · {projects.length} 项目</div>
+            </div>
+            <div style={{
+              padding: '10px 14px', borderRadius: '10px',
+              background: profile.skills ? 'var(--success-tint)' : 'var(--bg-secondary)',
+              border: `1px solid ${profile.skills ? 'var(--success-color)' : 'var(--border-color)'}33`
+            }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>技能</div>
+              <div style={{ fontSize: '14px', fontWeight: 500 }}>{profile.skills ? `${profile.skills.split(/[,，、]/).filter(Boolean).length} 项` : '待填写'}</div>
+            </div>
+          </div>
+        </LiquidCard>
+      </ScrollReveal>
 
       {/* ── 基本信息 ── */}
       <ScrollReveal>
@@ -1576,83 +1776,38 @@ export default function ResumeBuilder({ onToast }) {
         </LiquidCard>
       </ScrollReveal>
 
-      {/* ── 生成简历 ── */}
+      {/* ── 生成操作 ── */}
       <ScrollReveal delay={0.2}>
         <LiquidCard>
-          <SectionHeader
-            icon={FileText}
-            title="生成简历"
-            description="选择岗位并生成定制化简历"
-          />
-          <div style={{ paddingTop: '20px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '16px' }}>
-              <div className="form-item">
-                <label style={{ fontSize: '13px', fontWeight: 500 }}>选择岗位 <span style={{ color: 'var(--danger-color)' }}>*</span></label>
-                <select value={selectedJob} onChange={(e) => setSelectedJob(e.target.value)} className="form-control">
-                  <option value="">请选择岗位</option>
-                  {jobs.map((job) => (
-                    <option key={job.id} value={job.id}>{job.company} - {job.title}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-item">
-                <label style={{ fontSize: '13px', fontWeight: 500 }}>AI 生成模型</label>
-                <select value={selectedProvider} onChange={(e) => setSelectedProvider(e.target.value)} className="form-control">
-                  {providers.length === 0 && <option value="deepseek">DeepSeek</option>}
-                  {providers.map(provider => (
-                    <option key={provider.id} value={provider.id} disabled={!provider.configured}>
-                      {provider.label} {provider.configured ? `(${provider.model})` : '(未配置 Key)'}
-                    </option>
-                  ))}
-                </select>
-              </div>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: '200px' }}>
+              <select value={selectedJob || ''} onChange={(e) => setSelectedJob(e.target.value ? Number(e.target.value) : null)} className="form-control">
+                <option value="">选择目标岗位（可选）</option>
+                {jobs.map(job => <option key={job.id} value={job.id}>{job.company} — {job.title}</option>)}
+              </select>
             </div>
-
-            <div style={{ display: 'flex', gap: '32px', flexWrap: 'wrap', marginBottom: '16px' }}>
-              <MagneticButton variant="primary" onClick={handleSaveProfile} disabled={isSaving} style={{ flex: 1 }}>
-                <FloppyDisk size={18} style={{ marginRight: '6px' }} />
-                <div>
-                  <div style={{ fontSize: '14px', fontWeight: 600 }}>保存信息</div>
-                  <div style={{ fontSize: '11px', opacity: 0.8 }}>保存所有填写的个人信息</div>
-                </div>
-              </MagneticButton>
-              <MagneticButton variant="secondary" onClick={() => {
-                const data = { ...profile, education, experience, projects, modules }
-                if (!hasPreviewableContent(data)) {
-                  showToast(onToast, '暂无可预览内容，请先填写至少一项简历信息', 'info')
-                  return
-                }
-                setShowPreview(true)
-              }} style={{ flex: 1 }}>
-                <Eye size={18} style={{ marginRight: '6px' }} />
-                <div>
-                  <div style={{ fontSize: '14px', fontWeight: 600 }}>预览简历</div>
-                  <div style={{ fontSize: '11px', opacity: 0.8 }}>查看简历效果预览</div>
-                </div>
-              </MagneticButton>
-              <MagneticButton variant="warning" onClick={handleGeneratePdf} disabled={!selectedJob || isGenerating} style={{ flex: 1 }}>
-                <FileImage size={18} style={{ marginRight: '6px' }} />
-                <div>
-                  <div style={{ fontSize: '14px', fontWeight: 600 }}>生成 PDF</div>
-                  <div style={{ fontSize: '11px', opacity: 0.8 }}>生成可打印的 PDF 文件</div>
-                </div>
-              </MagneticButton>
-            </div>
-
-            {isGenerating && (
-              <div className="liquid-empty">
-                <div className="liquid-spinner" style={{ margin: '0 auto' }}></div>
-                <p>正在生成简历...</p>
-              </div>
-            )}
-
-            {!isGenerating && jobs.length === 0 && (
-              <div className="liquid-empty">
-                <FileText size={64} />
-                <p>暂无可生成简历的岗位，请先在岗位发现中导入或扫描岗位</p>
-              </div>
-            )}
+            <MagneticButton variant="secondary" onClick={handleSaveProfile} disabled={isSaving}>
+              <FloppyDisk size={16} style={{ marginRight: '4px' }} />保存
+            </MagneticButton>
+            <MagneticButton variant="secondary" onClick={() => {
+              const data = { ...profile, education, experience, projects, modules }
+              if (!hasPreviewableContent(data)) { showToast(onToast, '暂无可预览内容', 'info'); return }
+              setShowPreview(true)
+            }}>
+              <Eye size={16} style={{ marginRight: '4px' }} />预览
+            </MagneticButton>
+            <MagneticButton variant="primary" onClick={handleGeneratePdf} disabled={!selectedJob || isGenerating}>
+              <FileImage size={16} style={{ marginRight: '4px' }} />{isGenerating ? '生成中...' : '生成 PDF'}
+            </MagneticButton>
           </div>
+          {isGenerating && (
+            <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '13px' }}>
+              <div className="liquid-spinner" style={{ width: '16px', height: '16px', borderWidth: '2px' }} />正在生成简历...
+            </div>
+          )}
+          {!isGenerating && jobs.length === 0 && (
+            <div style={{ marginTop: '12px', fontSize: '13px', color: 'var(--text-muted)' }}>暂无可选岗位，先在「岗位」页面导入并评分</div>
+          )}
         </LiquidCard>
       </ScrollReveal>
 
@@ -1728,6 +1883,17 @@ export default function ResumeBuilder({ onToast }) {
         onClose={closeAiModal}
         section={aiModal.section}
         onFill={handleAiFill(aiModal.section)}
+        onToast={onToast}
+      />
+
+      {/* ── AI 批量导入模态框 ── */}
+      <BulkImportModal
+        isOpen={bulkImportOpen}
+        onClose={() => setBulkImportOpen(false)}
+        providers={providers}
+        selectedProvider={selectedProvider}
+        onProviderChange={setSelectedProvider}
+        onImport={handleBulkImport}
         onToast={onToast}
       />
     </PageTransition>

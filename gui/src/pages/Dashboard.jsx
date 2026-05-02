@@ -155,7 +155,7 @@ export default function Dashboard({ onToast }) {
                       <td>{value.message}</td>
                       <td>
                         {(key === 'cv' || key === 'portals' || key === 'profile') && value.status !== 'pass' ? (
-                          <Link to="/onboarding" className="btn btn-secondary btn-sm">去配置</Link>
+                          <Link to="/resume" className="btn btn-secondary btn-sm">去配置</Link>
                         ) : '-'}
                       </td>
                     </tr>

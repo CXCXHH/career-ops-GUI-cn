@@ -461,7 +461,7 @@ export default function InterviewPrep({ onToast }) {
           <div className="empty-state">
             <Briefcase />
             <p>暂无已评估的岗位</p>
-            <p style={{ fontSize: '13px', color: '#94a3b8' }}>请先在「岗位列表」页面进行 AI 评估</p>
+            <p style={{ fontSize: '13px', color: '#94a3b8' }}>请先在「岗位」页面进行 AI 评估</p>
           </div>
         )}
       </div>

@@ -31,7 +31,7 @@ modes/_profile.md
 data/job-radar/*.jsonl
 data/job-radar/*.json
 !data/job-radar/.gitkeep
-data/job-radar/resume-photo.png
+data/job-radar/resume-photo.*
 
 # User template (filled by user)
 template.JSON

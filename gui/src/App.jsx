@@ -4,15 +4,11 @@ import Sidebar from './components/Sidebar'
 import Toast from './components/Toast'
 import Dashboard from './pages/Dashboard'
 import Companies from './pages/Companies'
-import Discovery from './pages/Discovery'
 import Jobs from './pages/Jobs'
 import ResumeBuilder from './pages/ResumeBuilder'
 import Tracker from './pages/Tracker'
 import InterviewPrep from './pages/InterviewPrep'
-import Followups from './pages/Followups'
-import Candidates from './pages/Candidates'
 import Settings from './pages/Settings'
-import Onboarding from './pages/Onboarding'
 import './styles/liquid-hero.css'
 
 // Lazy load LiquidMetalHero to avoid SSR issues with Paper.js
@@ -53,15 +49,11 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard onToast={showToast} />} />
           <Route path="/companies" element={<Companies onToast={showToast} />} />
-          <Route path="/discovery" element={<Discovery onToast={showToast} />} />
           <Route path="/jobs" element={<Jobs onToast={showToast} />} />
           <Route path="/resume" element={<ResumeBuilder onToast={showToast} />} />
           <Route path="/tracker" element={<Tracker onToast={showToast} />} />
           <Route path="/interview" element={<InterviewPrep onToast={showToast} />} />
           <Route path="/interview-prep" element={<InterviewPrep onToast={showToast} />} />
-          <Route path="/followups" element={<Followups onToast={showToast} />} />
-          <Route path="/candidates" element={<Candidates onToast={showToast} />} />
-          <Route path="/onboarding" element={<Onboarding onToast={showToast} />} />
           <Route path="/settings" element={<Settings onToast={showToast} />} />
         </Routes>
       </main>

@@ -22,12 +22,6 @@ export const healthAPI = {
   syncCheck: () => unwrap(axios.post(`${API_BASE}/health/sync-check`))
 }
 
-export const onboardingAPI = {
-  status: () => unwrap(axios.get(`${API_BASE}/onboarding`)),
-  save: (data) => unwrap(axios.post(`${API_BASE}/onboarding`, data)),
-  loadData: () => unwrap(axios.get(`${API_BASE}/onboarding`)).then(r => r.data?.form || null)
-}
-
 export const companiesAPI = {
   getAll: () => unwrap(axios.get(`${API_BASE}/companies`)),
   create: (data) => unwrap(axios.post(`${API_BASE}/companies`, data)),
@@ -83,7 +77,8 @@ export const resumeAPI = {
   getVersion: (id) => unwrap(axios.get(`${API_BASE}/resume/files/${id}`)),
   deleteVersion: (id) => unwrap(axios.delete(`${API_BASE}/resume/files/${id}`)),
   deleteAllVersions: () => unwrap(axios.delete(`${API_BASE}/resume/files`)),
-  autoFill: (data) => unwrap(axios.post(`${API_BASE}/resume/auto-fill`, data))
+  autoFill: (data) => unwrap(axios.post(`${API_BASE}/resume/auto-fill`, data)),
+  bulkImport: (data) => unwrap(axios.post(`${API_BASE}/resume/bulk-import`, data))
 }
 
 export const discoveryAPI = {
@@ -93,13 +88,6 @@ export const discoveryAPI = {
   aiSearch: (params) => unwrap(axios.post(`${API_BASE}/discovery/ai-search`, params)),
   importJson: (jsonData) => unwrap(axios.post(`${API_BASE}/discovery/import-json`, { jsonData })),
   getRuns: () => unwrap(axios.get(`${API_BASE}/discovery/runs`))
-}
-
-export const candidatesAPI = {
-  getAll: () => unwrap(axios.get(`${API_BASE}/candidates`)),
-  delete: (id) => unwrap(axios.delete(`${API_BASE}/candidates/${id}`)),
-  batchDelete: (ids) => unwrap(axios.post(`${API_BASE}/candidates/batch-delete`, { ids })),
-  promote: (id) => unwrap(axios.post(`${API_BASE}/candidates/promote`, { id }))
 }
 
 export const trackerAPI = {

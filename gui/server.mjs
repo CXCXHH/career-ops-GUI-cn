@@ -5,6 +5,9 @@ import { execFile } from 'child_process'
 import yaml from 'js-yaml'
 import { chromium } from 'playwright'
 import { classifyLiveness } from '../scripts/jobs/liveness-core.mjs'
+import { PROFILE_SCHEMA } from './server/schema.js'
+import { mergeData, mergeField } from './server/merge.js'
+import { SYSTEM_PROMPTS, buildBulkImportPrompt, buildAutoFillPrompt, buildEvaluatePrompt, buildInterviewPrompt, buildOptimizeJdPrompt } from './server/prompts.js'
 import https from 'https'
 import http from 'http'
 
@@ -1964,23 +1967,23 @@ function deleteResumePhoto() {
 }
 
 function saveResumeModuleData(moduleId, payload = {}) {
-  if (!BUILTIN_RESUME_DATA_MODULES.has(moduleId)) {
+  // Schema-driven: look up the module mapping, validate, and save
+  const MODULE_TO_FIELD = {
+    education: { key: 'education', schema: PROFILE_SCHEMA.education },
+    experience: { key: 'experience', schema: PROFILE_SCHEMA.experience },
+    projects: { key: 'projects', schema: PROFILE_SCHEMA.projects },
+  }
+
+  const mapping = MODULE_TO_FIELD[moduleId]
+  if (!mapping) {
     throw new Error('Unsupported resume data module')
   }
 
-  const current = getResumeProfile()
-  const next = { ...current }
+  const data = payload[mapping.key]
+  if (!Array.isArray(data)) throw new Error(`${mapping.key} must be an array`)
 
-  if (moduleId === 'education') {
-    if (!Array.isArray(payload.education)) throw new Error('education must be an array')
-    next.education = payload.education
-  } else if (moduleId === 'experience') {
-    if (!Array.isArray(payload.experience)) throw new Error('experience must be an array')
-    next.experience = payload.experience
-  } else if (moduleId === 'projects') {
-    if (!Array.isArray(payload.projects)) throw new Error('projects must be an array')
-    next.projects = payload.projects
-  }
+  const current = getResumeProfile()
+  const next = { ...current, [mapping.key]: data }
 
   writeFileSync(RESUME_PROFILE_FILE, JSON.stringify(next, null, 2), 'utf-8')
   return next
@@ -6247,6 +6250,53 @@ const routes = {
     DELETE: async () => {
       const profile = deleteResumePhoto()
       return { success: true, data: profile }
+    }
+  },
+  '/api/resume/bulk-import': {
+    POST: async (body) => {
+      const { provider, userInput } = body || {}
+      if (!userInput || !userInput.trim()) {
+        return { success: false, error: '请输入要导入的资料内容' }
+      }
+      const profile = getResumeProfile()
+
+      const prompt = buildBulkImportPrompt(userInput, profile)
+
+      try {
+        const response = await callChatCompletions(provider, prompt, {
+          systemPrompt: SYSTEM_PROMPTS.resume,
+          temperature: 0.1,
+          maxTokens: 6000
+        })
+        const parsed = extractJsonObject(response.content)
+
+        // Merge via unified function
+        const merged = mergeData(profile, parsed, PROFILE_SCHEMA)
+
+        // Awards handled separately (custom module)
+        const newAwards = parsed.awards || ''
+        if (newAwards) {
+          const existingAwards = (profile.modules || []).find(m => m.id === 'awards')?.content || ''
+          const existingList = existingAwards.split(/[；;]/).map(s => s.trim()).filter(Boolean)
+          const newList = newAwards.split(/[；;]/).map(s => s.trim()).filter(Boolean)
+          const awardSet = new Set(existingList)
+          for (const a of newList) awardSet.add(a)
+          const mergedAwards = Array.from(awardSet).join('；')
+          const modules = normalizeResumeModules(merged.modules)
+          const awardsIdx = modules.findIndex(m => m.id === 'awards')
+          if (awardsIdx >= 0) {
+            modules[awardsIdx].content = mergedAwards
+          } else {
+            modules.push({ id: 'awards', name: '获奖荣誉', type: 'custom', enabled: true, content: mergedAwards })
+          }
+          merged.modules = modules
+        }
+
+        const saved = saveResumeProfile(merged)
+        return { success: true, data: saved }
+      } catch (error) {
+        return { success: false, error: `AI 导入失败：${error.message}` }
+      }
     }
   },
   '/api/resume/auto-fill': {
