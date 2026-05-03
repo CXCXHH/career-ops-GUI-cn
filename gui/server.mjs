@@ -2696,10 +2696,11 @@ async function adaptExistingProjectsWithAi(job, profile, projects, provider = 'd
 
 硬性规则：
 1. 不得改变项目本质，不得把没做过的内容写成做过。
-2. 可以调整项目标题、技术栈排序和 bullet 表达，使其更贴近岗位要求。
+2. 只能做两件事：(a) 用岗位 JD 中的关键词微调描述措辞；(b) 调整技术栈排序使其更贴近岗位。
 3. 每个项目只能输出 3 条 bullet，每条包含动作、技术和验证方式/结果。
 4. 如果项目与岗位严重不匹配，只保留可迁移能力，不要强行改成目标岗位项目。
 5. 不得编造论文、竞赛、奖项、证书、真实公司经历、生产上线、客户、营收、专利、量产数据。
+6. 不得添加候选人未提及的技术、工具或成果。改写后的描述必须能从原始描述中推导出来。
 
 目标岗位：${job.company || ''} - ${job.title || ''}
 岗位领域：${context.inferred.domain.label} (${context.inferred.domain.primary})
@@ -2794,45 +2795,10 @@ async function buildTailoredResume(job, profile, provider) {
 
   const profileExperience = Array.isArray(profile.experience) ? profile.experience : []
   const projectPlan = context.inferred.project_plan
-  const needProjectCount = projectPlan.new_projects.length
-
-  if (needProjectCount > 0) {
-    try {
-      // Calculate the latest end date across all existing projects
-      let latestEndYear = 0, latestEndMonth = 0
-      for (const p of projects) {
-        const endPart = p.time.replace(/.*至\s*/, '').replace('至今', '').trim()
-        const m = endPart.match(/(\d{4})-(\d{2})/)
-        if (m) {
-          const y = parseInt(m[1]), mo = parseInt(m[2])
-          if (y * 12 + mo > latestEndYear * 12 + latestEndMonth) {
-            latestEndYear = y; latestEndMonth = mo
-          }
-        }
-      }
-      const lastProjectEndDate = latestEndYear > 0 ? `${latestEndYear}-${String(latestEndMonth).padStart(2, '0')}` : ''
-      const generatedProjects = await generateProjectsWithAi(job, profile, profileProjects, needProjectCount, lastProjectEndDate, resumeProvider, context)
-      const validation = validateGeneratedProjects(generatedProjects, context)
-      const aiProjects = validation.projects
-      if (validation.warnings.length) console.warn('AI project validation warnings:', validation.warnings.join('; '))
-      projects.push(...aiProjects)
-
-      // Re-sort by time after adding AI projects
-      projects.sort((a, b) => {
-        const parseTime = (t) => {
-          const m = t.match(/(\d{4})-(\d{2})/)
-          return m ? parseInt(m[1]) * 12 + parseInt(m[2]) : 0
-        }
-        return parseTime(a.time) - parseTime(b.time)
-      })
-    } catch (e) {
-      console.error('AI project generation failed:', e.message)
-    }
-  }
 
   const gaps = [
     ...(job.gaps || []),
-    ...(projects.length === 0 ? ['项目经历不足：请补充真实项目，或配置 AI 后重新生成岗位化作品集项目。'] : []),
+    ...(projects.length === 0 ? ['项目经历不足：请补充真实项目后重新定制。'] : []),
     ...(projectPlan.weak_job_description ? ['岗位描述不足：当前基于搜索页/有限信息保守生成，建议补充完整 JD 后重新定制。'] : [])
   ].slice(0, 3)
 
@@ -2863,18 +2829,46 @@ async function buildTailoredResume(job, profile, provider) {
     bullets: (e.description || '').split('\n').filter(l => l.trim())
   }))
 
-  return {
-    profile,
-    company,
-    role,
-    summary,
-    skills,
-    projects,
-    gaps,
-    modules,
-    education,
-    experience
+  // ── Build diff: compare original profile vs tailored resume ──
+  const originalSkills = parseKeywordList(profile.skills)
+  const tailoredSkillNames = Array.isArray(skills)
+    ? skills.flatMap(g => (g.items || []).map(i => typeof i === 'string' ? i : i.name || '')).filter(Boolean)
+    : parseKeywordList(skills)
+  const skillsChanged = JSON.stringify(originalSkills.sort()) !== JSON.stringify(tailoredSkillNames.sort())
+
+  const originalProjectNames = (context.candidate.projects || []).map(p => getProjectDisplayName(p))
+  const tailoredProjectNames = projects.map(p => p.title)
+  const filteredProjects = originalProjectNames.filter(name => !tailoredProjectNames.includes(name))
+
+  const originalSummary = String(profile.summary || '').trim()
+  const summaryChanged = originalSummary !== String(summary || '').trim()
+
+  const diff = {
+    summary: { original: originalSummary, tailored: String(summary || '').trim(), changed: summaryChanged },
+    skills: {
+      original: originalSkills,
+      tailored: tailoredSkillNames,
+      changed: skillsChanged,
+      note: skillsChanged ? '已根据岗位需求调整技能排序和筛选' : '技能未变化'
+    },
+    projects: projects.map(p => {
+      const orig = (context.candidate.projects || []).find(op => getProjectDisplayName(op) === p.title)
+      const origBullets = orig ? (orig.description || '').split(/[；;\n]/).map(l => l.trim()).filter(Boolean) : []
+      const changed = JSON.stringify(origBullets) !== JSON.stringify(p.bullets)
+      return {
+        name: p.title,
+        action: changed ? 'rephrased' : 'kept',
+        original_bullets: origBullets,
+        tailored_bullets: p.bullets,
+        note: changed ? '描述已根据岗位关键词微调' : '未修改'
+      }
+    }),
+    filtered_projects: filteredProjects,
+    note: filteredProjects.length > 0 ? `筛选掉 ${filteredProjects.length} 个与岗位关联度较低的项目` : '所有项目均已保留'
   }
+
+  const resume = { profile, company, role, summary, skills, projects, gaps, modules, education, experience }
+  return { resume, diff }
 }
 
 function formatDateShort(date) {
@@ -6155,8 +6149,8 @@ const routes = {
       }
 
       const profile = getResumeProfile()
-      const resume = await buildTailoredResume(job, profile, provider)
-      return { success: true, data: resume }
+      const result = await buildTailoredResume(job, profile, provider)
+      return { success: true, data: result }
     }
   },
   '/api/jobs/:id/resume/pdf': {
@@ -6175,7 +6169,8 @@ const routes = {
       const fileName = artifactNames.pdf
       const htmlName = artifactNames.html
       const htmlPath = `${PROJECT_ROOT}/tmp/${htmlName}`
-      const resume = await buildTailoredResume(job, profile, body.provider)
+      const result = await buildTailoredResume(job, profile, body.provider)
+      const resume = result.resume
       writeFileSync(htmlPath, buildResumeHtml(resume), 'utf-8')
       await execFileAsync('node', ['scripts/cv/generate-pdf.mjs', `tmp/${htmlName}`, `output/${fileName}`, '--format=a4'], { cwd: PROJECT_ROOT })
 
@@ -6200,7 +6195,8 @@ const routes = {
           projects: resume.projects,
           gaps: resume.gaps,
           modules: resume.modules,
-        }
+        },
+        diff: result.diff
       }
       writeFileSync(`${versionsDir}/${versionId}.json`, JSON.stringify(versionData, null, 2), 'utf-8')
 
