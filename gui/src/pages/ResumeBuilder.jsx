@@ -725,43 +725,38 @@ function BulkImportModal({ isOpen, onClose, providers, selectedProvider, onProvi
   )
 }
 
-function PreviewModal({ profile, education, experience, projects, modules, photoPreview, onClose }) {
+function PreviewModal({ profile, education, experience, projects, modules, photoPreview, onClose, onProfileUpdate }) {
+  const [skillGroups, setSkillGroups] = useState(() =>
+    Array.isArray(profile.generated_skill_groups) && profile.generated_skill_groups.length > 0
+      ? profile.generated_skill_groups : null
+  )
+  const [loadingSkills, setLoadingSkills] = useState(false)
+
+  useEffect(() => {
+    if (skillGroups || !profile.skills) return
+    let cancelled = false
+    setLoadingSkills(true)
+    resumeAPI.generateSkillGroups().then(res => {
+      if (cancelled) return
+      const groups = res.data
+      if (Array.isArray(groups) && groups.length > 0) {
+        setSkillGroups(groups)
+        if (onProfileUpdate) onProfileUpdate(prev => ({ ...prev, generated_skill_groups: groups }))
+      }
+    }).catch(() => {}).finally(() => { if (!cancelled) setLoadingSkills(false) })
+    return () => { cancelled = true }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const asText = (value) => {
     if (Array.isArray(value)) return value.map(item => String(item || '').trim()).filter(Boolean).join('、')
     return String(value || '').trim()
   }
-
   const hasText = (value) => asText(value).length > 0
-  const isFilledEducation = (item) => (
-    hasText(item?.school) ||
-    hasText(item?.major) ||
-    hasText(item?.degree) ||
-    hasText(item?.gpa) ||
-    hasText(item?.description) ||
-    hasText(item?.start_date) ||
-    hasText(item?.end_date)
-  )
-  const isFilledExperience = (item) => (
-    hasText(item?.company) ||
-    hasText(item?.position) ||
-    hasText(item?.role) ||
-    hasText(item?.description) ||
-    hasText(item?.start_date) ||
-    hasText(item?.end_date)
-  )
-  const isFilledProject = (item) => (
-    hasText(item?.name) ||
-    hasText(item?.role) ||
-    hasText(item?.tech_stack) ||
-    hasText(item?.description) ||
-    hasText(item?.responsibility) ||
-    hasText(item?.start_date) ||
-    hasText(item?.end_date)
-  )
+  const isFilled = (item, keys) => keys.some(k => hasText(item?.[k]))
   const photoSrc = resolvePhotoSrc(profile, photoPreview)
-  const previewEducation = (education || []).filter(isFilledEducation)
-  const previewExperience = (experience || []).filter(isFilledExperience)
-  const previewProjects = (projects || []).filter(isFilledProject)
+  const previewEducation = (education || []).filter(item => isFilled(item, ['school', 'major', 'degree', 'gpa', 'description', 'start_date', 'end_date']))
+  const previewExperience = (experience || []).filter(item => isFilled(item, ['company', 'position', 'role', 'description', 'start_date', 'end_date']))
+  const previewProjects = (projects || []).filter(item => isFilled(item, ['name', 'role', 'tech_stack', 'description', 'start_date', 'end_date']))
 
   const formatDate = (date) => {
     if (!date) return ''
@@ -769,139 +764,134 @@ function PreviewModal({ profile, education, experience, projects, modules, photo
     const [year, month] = date.split('-')
     return `${year}年${parseInt(month)}月`
   }
+  const formatRange = (s, e) => {
+    const fs = formatDate(s), fe = formatDate(e)
+    if (!fs && !fe) return ''
+    if (!fe) return `${fs} 至 至今`
+    return `${fs} 至 ${fe}`
+  }
 
   const enabledModules = (modules || []).filter(m => m.enabled)
-  const hasHeaderContent = Boolean(
-    hasText(profile.full_name) ||
-    hasText(profile.gender) ||
-    hasText(profile.age) ||
-    hasText(profile.phone) ||
-    hasText(profile.email) ||
-    hasText(profile.wechat) ||
-    hasText(profile.github)
-  )
+  const hasHeaderContent = hasText(profile.full_name) || hasText(profile.phone) || hasText(profile.email) || hasText(profile.wechat) || hasText(profile.github)
+  const bulletLines = (text) => asText(text).split(/[；;\n]/).map(l => l.trim()).filter(Boolean)
 
-  const renderBulletLines = (text) => asText(text)
-    .split(/[；;\n]/)
-    .map(item => item.trim())
-    .filter(Boolean)
+  // ── PDF-identical inline styles ──
+  const S = {
+    page: { fontFamily: '"Microsoft YaHei","Noto Sans CJK SC",Arial,sans-serif', color: '#1e293b', fontSize: '12px', lineHeight: 1.6, background: '#fff', padding: '2mm 16mm' },
+    header: { display: 'grid', gridTemplateColumns: photoSrc ? '1fr 28mm' : '1fr', gap: '12px', alignItems: 'start', borderBottom: '2px solid #1178CC', paddingBottom: '8px', marginBottom: '8px' },
+    h1: { margin: '0 0 4px', fontSize: '28px', color: '#1178CC', fontWeight: 700, letterSpacing: 0 },
+    contact: { color: '#475569', display: 'flex', flexWrap: 'wrap', gap: '8px' },
+    photo: { width: '70px', height: '90px', objectFit: 'cover', border: '1px solid #1178CC' },
+    section: { marginBottom: '12px' },
+    sectionTitle: { color: '#000', fontWeight: 700, fontSize: '14px', textAlign: 'center', marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px', whiteSpace: 'nowrap' },
+    hr: { flex: 1, height: 0, borderTop: '1px solid #999' },
+    item: { marginBottom: '10px' },
+    itemHead: { display: 'flex', justifyContent: 'space-between', gap: '10px', fontWeight: 700, color: '#1178CC', fontSize: '12.5px' },
+    muted: { color: '#64748b', fontSize: '12px' },
+    ul: { margin: '5px 0 0 18px', padding: 0 },
+    li: { marginBottom: '3px' }
+  }
 
-  const renderSectionTitle = (title) => (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: '12px',
-      margin: '20px 0 12px',
-      fontSize: '15px',
-      fontWeight: 600,
-      color: 'var(--text-primary)',
-      fontFamily: 'var(--font-serif)'
-    }}>
-      <span style={{ flex: 1, height: '1px', background: 'var(--border-color)' }} />
-      <span>{title}</span>
-      <span style={{ flex: 1, height: '1px', background: 'var(--border-color)' }} />
-    </div>
+  const SectTitle = ({ children }) => (
+    <div style={S.sectionTitle}><span style={S.hr} /><span>{children}</span><span style={S.hr} /></div>
   )
+  const Bullets = ({ text }) => {
+    const lines = bulletLines(text)
+    return lines.length ? <ul style={S.ul}>{lines.map((l, i) => <li key={i} style={S.li}>{l}</li>)}</ul> : null
+  }
 
   const renderModule = (mod) => {
     if (mod.type === 'custom' && mod.content) {
-      const lines = renderBulletLines(mod.content)
-      return (
-        <section key={mod.id} style={{ marginBottom: '16px' }}>
-          {renderSectionTitle(mod.name)}
-          {lines.map((line, idx) => (
-            <div key={idx} style={{ marginBottom: '4px', fontSize: '13px', color: 'var(--text-primary)' }}>{line}</div>
-          ))}
+      const lines = bulletLines(mod.content)
+      return lines.length ? (
+        <section key={mod.id} style={S.section}>
+          <SectTitle>{mod.name}</SectTitle>
+          <ul style={S.ul}>{lines.map((l, i) => <li key={i} style={S.li}>{l}</li>)}</ul>
         </section>
-      )
+      ) : null
     }
-
     switch (mod.id) {
       case 'summary':
         return hasText(profile.summary) ? (
-          <section key="summary" style={{ marginBottom: '16px' }}>
-            {renderSectionTitle('求职定位')}
-            <p style={{ fontSize: '13px', lineHeight: '1.7', color: 'var(--text-primary)' }}>{asText(profile.summary)}</p>
+          <section key="summary" style={S.section}>
+            <SectTitle>求职定位</SectTitle>
+            <p style={{ margin: 0 }}>{asText(profile.summary)}</p>
           </section>
         ) : null
       case 'skills': {
         const skillsText = asText(profile.skills)
-        if (!skillsText) return null
-        const skillItems = skillsText.split(/[、,，|]/).filter(Boolean)
+        if (!skillsText && !skillGroups) return null
+        if (loadingSkills) {
+          return (
+            <section key="skills" style={S.section}>
+              <SectTitle>核心能力</SectTitle>
+              <div style={{ color: '#94a3b8', fontSize: '12px', textAlign: 'center' }}>AI 正在生成技能分组...</div>
+            </section>
+          )
+        }
+        const groups = skillGroups && skillGroups.length > 0
+          ? (skillGroups[0]?.group ? skillGroups : [{ group: '', items: skillGroups }])
+          : [{ group: '', items: skillsText.split(/[、,，|]/).map(s => s.trim()).filter(Boolean) }]
         return (
-          <section key="skills" style={{ marginBottom: '16px' }}>
-            {renderSectionTitle('核心能力')}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {skillItems.map((s, i) => (
-                <span key={i} style={{
-                  fontSize: '12px',
-                  padding: '4px 12px',
-                  background: 'var(--haze-blue-100)',
-                  color: 'var(--haze-blue-800)',
-                  borderRadius: '12px'
-                }}>{s.trim()}</span>
-              ))}
-            </div>
+          <section key="skills" style={S.section}>
+            <SectTitle>核心能力</SectTitle>
+            {groups.map((g, gi) => (
+              <div key={gi} style={{ marginBottom: '6px' }}>
+                {g.group ? <span style={{ color: '#1178CC', fontWeight: 700, fontSize: '12.5px', marginRight: '10px' }}>{g.group}</span> : null}
+                <span style={{ color: '#1e293b' }}>{(g.items || []).join('　')}</span>
+              </div>
+            ))}
           </section>
         )
       }
-      case 'experience':
-        return previewExperience.length > 0 ? (
-          <section key="experience" style={{ marginBottom: '16px' }}>
-            {renderSectionTitle('工作经历')}
-            {previewExperience.map((item, i) => (
-              <div key={i} style={{ marginBottom: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 500 }}>
-                  <span>{[asText(item.company), asText(item.position)].filter(Boolean).join(' | ')}</span>
-                  <span style={{ color: 'var(--text-muted)' }}>{formatDate(item.start_date)} ~ {formatDate(item.end_date)}</span>
+      case 'education':
+        return previewEducation.length > 0 ? (
+          <section key="education" style={S.section}>
+            <SectTitle>教育背景</SectTitle>
+            {previewEducation.map((item, i) => (
+              <div key={i} style={S.item}>
+                <div style={S.itemHead}>
+                  <span>{[asText(item.school), asText(item.major), asText(item.degree)].filter(Boolean).join(' | ')}</span>
+                  <span style={S.muted}>{formatRange(item.start_date, item.end_date)}</span>
                 </div>
-                {hasText(item.role) && <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>分工：{asText(item.role)}</div>}
-                {renderBulletLines(item.description).length > 0 && (
-                  <ul style={{ margin: '6px 0 0 16px', padding: 0, fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.7' }}>
-                    {renderBulletLines(item.description).map((line, idx) => <li key={idx}>{line}</li>)}
+                {(hasText(item.gpa) || hasText(item.description)) && (
+                  <ul style={S.ul}>
+                    {hasText(item.gpa) && <li style={S.li}>GPA：{asText(item.gpa)}</li>}
+                    {hasText(item.description) && <li style={S.li}>相关课程：{asText(item.description)}</li>}
                   </ul>
                 )}
+              </div>
+            ))}
+          </section>
+        ) : null
+      case 'experience':
+        return previewExperience.length > 0 ? (
+          <section key="experience" style={S.section}>
+            <SectTitle>工作经历</SectTitle>
+            {previewExperience.map((item, i) => (
+              <div key={i} style={S.item}>
+                <div style={S.itemHead}>
+                  <span>{asText(item.company)}</span>
+                  <span>{asText(item.position)} | {formatRange(item.start_date, item.end_date)}</span>
+                </div>
+                <Bullets text={item.description} />
               </div>
             ))}
           </section>
         ) : null
       case 'projects':
         return previewProjects.length > 0 ? (
-          <section key="projects" style={{ marginBottom: '16px' }}>
-            {renderSectionTitle('项目经历')}
+          <section key="projects" style={S.section}>
+            <SectTitle>项目经历</SectTitle>
             {previewProjects.map((item, i) => (
-              <div key={i} style={{ marginBottom: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 500 }}>
-                  <span>{asText(item.name)}</span>
-                  <span style={{ color: 'var(--text-muted)' }}>{formatDate(item.start_date)} ~ {formatDate(item.end_date)}</span>
+              <div key={i} style={S.item}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 700, color: '#1178CC', fontSize: '12.5px' }}>
+                  <span style={{ flex: 1 }}>{asText(item.name)}</span>
+                  <span style={{ flex: 1, textAlign: 'center', fontWeight: 400, color: '#475569' }}>{asText(item.role)}</span>
+                  <span style={{ flex: 1, textAlign: 'right', ...S.muted }}>{formatRange(item.start_date, item.end_date)}</span>
                 </div>
-                {hasText(item.role) && <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>角色：{asText(item.role)}</div>}
-                {hasText(item.tech_stack) && <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}><strong>技术栈：</strong>{asText(item.tech_stack)}</div>}
-                {renderBulletLines(item.description).length > 0 && (
-                  <ul style={{ margin: '6px 0 0 16px', padding: 0, fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.7' }}>
-                    {renderBulletLines(item.description).map((line, idx) => <li key={idx}>{line}</li>)}
-                  </ul>
-                )}
-              </div>
-            ))}
-          </section>
-        ) : null
-      case 'education':
-        return previewEducation.length > 0 ? (
-          <section key="education" style={{ marginBottom: '16px' }}>
-            {renderSectionTitle('教育背景')}
-            {previewEducation.map((item, i) => (
-              <div key={i} style={{ marginBottom: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 500 }}>
-                  <span>{[asText(item.school), asText(item.major), asText(item.degree)].filter(Boolean).join(' | ')}</span>
-                  <span style={{ color: 'var(--text-muted)' }}>{formatDate(item.start_date)} ~ {formatDate(item.end_date)}</span>
-                </div>
-                {(hasText(item.gpa) || hasText(item.description)) && (
-                  <ul style={{ margin: '6px 0 0 16px', padding: 0, fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.7' }}>
-                    {hasText(item.gpa) && <li>GPA：{asText(item.gpa)}</li>}
-                    {renderBulletLines(item.description).map((line, idx) => <li key={idx}>{line}</li>)}
-                  </ul>
-                )}
+                {hasText(item.tech_stack) && <div><strong>技术栈：</strong>{asText(item.tech_stack)}</div>}
+                <Bullets text={item.description} />
               </div>
             ))}
           </section>
@@ -913,7 +903,7 @@ function PreviewModal({ profile, education, experience, projects, modules, photo
     }
   }
 
-  const renderedSections = enabledModules.map(mod => renderModule(mod)).filter(Boolean)
+  const renderedSections = enabledModules.map(renderModule).filter(Boolean)
   const hasPreviewContent = hasHeaderContent || renderedSections.length > 0
 
   return (
@@ -931,28 +921,23 @@ function PreviewModal({ profile, education, experience, projects, modules, photo
               <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>先填写基本信息、教育背景、项目经历或自定义模块内容，再预览简历。</p>
             </div>
           ) : (
-            <div style={{
-              background: '#fff',
-              borderRadius: '16px',
-              padding: '40px',
-              boxShadow: '0 4px 24px rgba(0,0,0,0.06)'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
-                <div>
-                  <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '12px' }}>
-                    {asText(profile.full_name) || '简历预览'}
-                  </h1>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 16px', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                    {(hasText(profile.gender) || hasText(profile.age)) && <span>{asText(profile.gender) || ''}{hasText(profile.age) ? ' · ' + asText(profile.age) + '岁' : ''}</span>}
-                    {hasText(profile.phone) && <span>手机：{asText(profile.phone)}</span>}
-                    {hasText(profile.email) && <span>邮箱：{asText(profile.email)}</span>}
-                    {hasText(profile.wechat) && <span>微信：{asText(profile.wechat)}</span>}
-                    {hasText(profile.github) && <span>GitHub：{asText(profile.github)}</span>}
+            <div style={{ maxWidth: '794px', margin: '0 auto' }}>
+              <div style={S.page}>
+                <header style={S.header}>
+                  <div>
+                    <h1 style={S.h1}>{asText(profile.full_name) || '简历预览'}</h1>
+                    <div style={S.contact}>
+                      {(hasText(profile.gender) || hasText(profile.age)) && <span>{asText(profile.gender)}{hasText(profile.age) ? ` · ${asText(profile.age)}岁` : ''}</span>}
+                      {hasText(profile.phone) && <span>手机：{asText(profile.phone)}</span>}
+                      {hasText(profile.email) && <span>邮箱：{asText(profile.email)}</span>}
+                      {hasText(profile.wechat) && <span>微信：{asText(profile.wechat)}</span>}
+                      {hasText(profile.github) && <span>GitHub：{asText(profile.github)}</span>}
+                    </div>
                   </div>
-                </div>
-                {photoSrc ? <img style={{ width: '100px', height: '130px', objectFit: 'cover', borderRadius: '8px' }} src={photoSrc} alt="个人照片" /> : null}
+                  {photoSrc ? <img style={S.photo} src={photoSrc} alt="个人照片" /> : null}
+                </header>
+                {renderedSections}
               </div>
-              {renderedSections}
             </div>
           )}
         </div>
@@ -1934,6 +1919,7 @@ export default function ResumeBuilder({ onToast }) {
           modules={modules}
           photoPreview={photoPreview}
           onClose={() => setShowPreview(false)}
+          onProfileUpdate={setProfile}
         />
       )}
 

@@ -62,15 +62,45 @@ const TRACKER_TEMPLATE = '# Applications Tracker\n\n| # | Date | Company | Role 
 const DEFAULT_RESUME_MODULES = [
   { id: 'summary', name: '求职定位', type: 'builtin', enabled: true },
   { id: 'skills', name: '核心能力', type: 'builtin', enabled: true },
+  { id: 'education', name: '教育背景', type: 'builtin', enabled: true },
   { id: 'experience', name: '工作经历', type: 'builtin', enabled: true },
   { id: 'projects', name: '项目经历', type: 'builtin', enabled: true },
-  { id: 'education', name: '教育背景', type: 'builtin', enabled: true },
-  { id: 'gaps', name: '针对岗位的补充准备', type: 'builtin', enabled: true }
+  { id: 'gaps', name: '针对岗位的补充准备', type: 'builtin', enabled: false }
 ]
 
-function normalizeResumeModules(modules) {
-  const source = Array.isArray(modules) ? modules : DEFAULT_RESUME_MODULES
-  return source.filter(module => module?.id !== 'paper').map(module => ({ ...module }))
+const MODULES_VERSION = 2 // bump when defaults change
+
+function normalizeResumeModules(modules, modulesVersion, deletedBuiltinModules = []) {
+  const source = Array.isArray(modules) ? modules : []
+  const needsMigration = !modulesVersion || modulesVersion < MODULES_VERSION
+  const deletedSet = new Set(Array.isArray(deletedBuiltinModules) ? deletedBuiltinModules : [])
+
+  const byId = new Map()
+  for (const m of source) {
+    if (m?.id && m.id !== 'paper') byId.set(m.id, { ...m })
+  }
+
+  // 注入缺失的内置模块（使用最新默认值），跳过用户主动删除的
+  for (const def of DEFAULT_RESUME_MODULES) {
+    if (!byId.has(def.id) && !deletedSet.has(def.id)) byId.set(def.id, { ...def })
+  }
+
+  // 老版本数据迁移：默认关闭 gaps 模块（用户可在 UI 手动重新启用）
+  if (needsMigration) {
+    const gaps = byId.get('gaps')
+    if (gaps && gaps.enabled) gaps.enabled = false
+  }
+
+  // 按 DEFAULT_RESUME_MODULES 的顺序输出，再追加自定义模块
+  const defaultOrder = DEFAULT_RESUME_MODULES.map(m => m.id)
+  const ordered = []
+  for (const id of defaultOrder) {
+    if (byId.has(id)) ordered.push(byId.get(id))
+  }
+  for (const [id, m] of byId) {
+    if (!defaultOrder.includes(id)) ordered.push(m)
+  }
+  return ordered
 }
 
 const BUILTIN_RESUME_DATA_MODULES = new Set(['education', 'experience', 'projects'])
@@ -774,9 +804,15 @@ function clearAiSettings(provider) {
   throw new Error('不支持的 AI Provider')
 }
 
+function isTemplateContent(text) {
+  if (!text) return true
+  const markers = ['[你的', '[Your ', 'jane@example.com', 'Jane Smith', 'janesmith', '+1-555-0123', '[公司名称]', '[职位]', '[职责/成就']
+  return markers.some(m => text.includes(m))
+}
+
 function buildCandidateResumeContext() {
   const cv = readTextIfExists(`${PROJECT_ROOT}/cv.md`, 16000).trim()
-  if (cv) return cv
+  if (cv && !isTemplateContent(cv)) return cv
 
   const profile = getResumeProfile()
   const lines = []
@@ -832,12 +868,16 @@ function buildEvaluableJobDescription(job = {}) {
 
 function buildEvaluationPrompt(job) {
   const candidateResume = buildCandidateResumeContext()
-  const cv = readTextIfExists(`${PROJECT_ROOT}/cv.md`, 16000)
-  const profile = readTextIfExists(`${PROJECT_ROOT}/config/profile.yml`, 8000)
-  const profileMode = readTextIfExists(`${PROJECT_ROOT}/modes/_profile.md`, 10000)
+  const cvRaw = readTextIfExists(`${PROJECT_ROOT}/cv.md`, 16000)
+  const cv = isTemplateContent(cvRaw) ? '' : cvRaw
+  const profileRaw = readTextIfExists(`${PROJECT_ROOT}/config/profile.yml`, 8000)
+  const profile = isTemplateContent(profileRaw) ? '' : profileRaw
+  const profileModeRaw = readTextIfExists(`${PROJECT_ROOT}/modes/_profile.md`, 10000)
+  const profileMode = isTemplateContent(profileModeRaw) ? '' : profileModeRaw
   const sharedMode = readTextIfExists(`${PROJECT_ROOT}/modes/_shared.md`, 10000)
   const ofertaMode = readTextIfExists(`${PROJECT_ROOT}/modes/oferta.md`, 10000)
-  const proofPoints = readTextIfExists(`${PROJECT_ROOT}/article-digest.md`, 10000)
+  const proofPointsRaw = readTextIfExists(`${PROJECT_ROOT}/article-digest.md`, 10000)
+  const proofPoints = isTemplateContent(proofPointsRaw) ? '' : proofPointsRaw
   const jobDescription = buildEvaluableJobDescription(job)
   const jd = [
     `Company: ${job.company || ''}`,
@@ -875,21 +915,14 @@ function buildEvaluationPrompt(job) {
 - 如果缺少 JD 关键项，要明确列为 gap。
 - 如果岗位只有搜索页/元数据/标签，请做保守粗评，不要直接判定“无法评估”；同时把 legitimacy 降为 Low Confidence 或 Medium Confidence，并在 gap 里说明缺少完整 JD。
 - 不要自动投递，只给评估。
+- 候选人背景方向必须基于下方实际材料判断，不要假设或编造候选人背景。
 
 ## Candidate Resume Context
 ${candidateResume || '未提供候选人简历信息'}
-
-## Raw cv.md
-${cv}
-
-## Profile YAML
-${profile}
-
-## User Profile Mode
-${profileMode}
-
-## Proof Points
-${proofPoints}
+${cv ? `\n## Raw cv.md\n${cv}` : ''}
+${profile ? `\n## Profile YAML\n${profile}` : ''}
+${profileMode ? `\n## User Profile Mode\n${profileMode}` : ''}
+${proofPoints ? `\n## Proof Points\n${proofPoints}` : ''}
 
 ## Shared Rules
 ${sharedMode}
@@ -1917,13 +1950,20 @@ function getDefaultResumeProfile() {
     target_role: '',
     summary: '',
     photo_path: '',
-    modules: normalizeResumeModules(DEFAULT_RESUME_MODULES)
+    modules: normalizeResumeModules(DEFAULT_RESUME_MODULES),
+    deletedBuiltinModules: []
   }
 }
 
 function getResumeProfile() {
   const profile = { ...getDefaultResumeProfile(), ...readJsonFile(RESUME_PROFILE_FILE, {}) }
-  profile.modules = normalizeResumeModules(profile.modules)
+  // 老版本回填：从未记录过 deletedBuiltinModules 时，用当前 modules 与默认值的差集推断
+  if (!Array.isArray(profile.deletedBuiltinModules)) {
+    const existingIds = new Set((profile.modules || []).map(m => m?.id).filter(Boolean))
+    const missing = DEFAULT_RESUME_MODULES.filter(def => !existingIds.has(def.id)).map(def => def.id)
+    if (missing.length > 0) profile.deletedBuiltinModules = missing
+  }
+  profile.modules = normalizeResumeModules(profile.modules, profile.modulesVersion, profile.deletedBuiltinModules)
   return profile
 }
 
@@ -1934,7 +1974,8 @@ function saveResumeProfile(profile) {
     ...profile,
     photo_path: profile.photo_path ?? current.photo_path
   }
-  next.modules = normalizeResumeModules(next.modules)
+  next.modules = normalizeResumeModules(next.modules, next.modulesVersion, next.deletedBuiltinModules)
+  next.modulesVersion = MODULES_VERSION
   if (profile.photoData && profile.photoName) {
     const match = String(profile.photoData).match(/^data:(image\/(png|jpeg|jpg));base64,(.+)$/)
     if (!match) throw new Error('照片格式只支持 PNG/JPG')
@@ -2867,7 +2908,7 @@ async function buildTailoredResume(job, profile, provider) {
     ...(projectPlan.weak_job_description ? ['岗位描述不足：当前基于搜索页/有限信息保守生成，建议补充完整 JD 后重新定制。'] : [])
   ].slice(0, 3)
 
-  const modules = normalizeResumeModules(profile.modules)
+  const modules = normalizeResumeModules(profile.modules, profile.modulesVersion, profile.deletedBuiltinModules)
 
   // Use user-filled education from profile, convert to resume format
   const profileEducation = Array.isArray(profile.education) ? profile.education : []
@@ -3360,7 +3401,7 @@ function buildDocxDocumentXml(resume, options = {}) {
     resume.profile.github ? `GitHub：${resume.profile.github}` : ''
   ].filter(Boolean)
 
-  const modules = normalizeResumeModules(resume.modules)
+  const modules = normalizeResumeModules(resume.modules, resume.profile?.modulesVersion, resume.profile?.deletedBuiltinModules)
 
   const moduleRenderers = {
     summary: () => [wSectionTitle('求职定位'), wParagraph(resume.summary)],
@@ -3444,7 +3485,8 @@ function buildDocxDocumentXml(resume, options = {}) {
     headerTable,
     ...modules.filter(mod => mod.enabled).flatMap(mod => {
       if (mod.type === 'custom' && mod.content) {
-        return [wSectionTitle(mod.name), ...String(mod.content || '').split('\n').filter(Boolean).map(line => wParagraph(line))]
+        const lines = String(mod.content).split(/[；;\n]+/).map(l => l.trim()).filter(Boolean)
+        return [wSectionTitle(mod.name), ...lines.map(wBullet)]
       }
       const renderer = moduleRenderers[mod.id]
       return renderer ? renderer() : []
@@ -3551,13 +3593,17 @@ function buildResumeHtml(resume) {
     gaps: () => resume.gaps.length ? `<section class="section"><div class="section-title">针对岗位的补充准备</div>${bulletList(resume.gaps)}</section>` : ''
   }
 
-  const modules = normalizeResumeModules(resume.modules)
+  const modules = normalizeResumeModules(resume.modules, resume.profile?.modulesVersion, resume.profile?.deletedBuiltinModules)
 
   const sectionsHtml = modules
     .filter(mod => mod.enabled)
     .map(mod => {
       if (mod.type === 'custom' && mod.content) {
-        return `<section class="section"><div class="section-title">${escapeHtml(mod.name)}</div><p>${escapeHtml(mod.content)}</p></section>`
+        const lines = String(mod.content).split(/[；;\n]+/).map(l => l.trim()).filter(Boolean)
+        const listHtml = lines.length > 0
+          ? `<ul>${lines.map(l => `<li>${escapeHtml(l)}</li>`).join('')}</ul>`
+          : `<p>${escapeHtml(mod.content)}</p>`
+        return `<section class="section"><div class="section-title">${escapeHtml(mod.name)}</div>${listHtml}</section>`
       }
       const renderer = moduleRenderers[mod.id]
       return renderer ? renderer() : ''
@@ -3571,7 +3617,7 @@ function buildResumeHtml(resume) {
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif; color: #1e293b; background: #fff; font-size: 12px; line-height: 1.6; }
-  .page { width: 210mm; min-height: 297mm; padding: 5mm 16mm; margin: 0 auto; }
+  .page { width: 210mm; min-height: 297mm; padding: 2mm 16mm; margin: 0 auto; }
   .header { display: grid; grid-template-columns: 1fr ${photo ? '28mm' : '0'}; gap: 12px; align-items: start; border-bottom: 2px solid #1178CC; padding-bottom: 8px; margin-bottom: 8px; }
   h1 { margin: 0 0 4px; font-size: 28px; color: #1178CC; letter-spacing: 0; }
   .contact { color: #475569; display: flex; flex-wrap: wrap; gap: 8px; }
@@ -5086,7 +5132,6 @@ async function scrapeJobBoardJobs(keywords, options = {}) {
         const zlCityCode = zlCityMap[city] || ''
         // Try multiple API endpoints
         const zlApiUrls = [
-          `https://fe-api.zhaopin.com/c/i/sou?pageSize=30&cityId=${zlCityCode}&kw=${encodedKeyword}&kt=3&at=5895d1d9437a4201b0260447c229c917&rt=504b697e3e2e4562b96b52ea4430b425`,
           `https://fe-api.zhaopin.com/c/i/sou?pageSize=30&cityId=${zlCityCode}&kw=${encodedKeyword}&kt=3`,
         ]
         
@@ -5737,11 +5782,11 @@ const routes = {
   '/api/resume/modules': {
     GET: async () => {
       const profile = getResumeProfile()
-      return { success: true, data: normalizeResumeModules(profile.modules) }
+      return { success: true, data: normalizeResumeModules(profile.modules, profile.modulesVersion, profile.deletedBuiltinModules) }
     },
     POST: async (body) => {
       const profile = getResumeProfile()
-      const modules = normalizeResumeModules(profile.modules)
+      const modules = normalizeResumeModules(profile.modules, profile.modulesVersion, profile.deletedBuiltinModules)
       const moduleType = body.type || 'custom'
       if (body.id === 'paper') return { success: false, error: '该内置模块已停用' }
       const newModule = {
@@ -5753,13 +5798,25 @@ const routes = {
       }
       modules.push(newModule)
       profile.modules = modules
+      // 如果重新添加了之前删除的内置模块，从删除列表中移除
+      if (newModule.type === 'builtin' && Array.isArray(profile.deletedBuiltinModules)) {
+        profile.deletedBuiltinModules = profile.deletedBuiltinModules.filter(id => id !== newModule.id)
+      }
       writeFileSync(RESUME_PROFILE_FILE, JSON.stringify(profile, null, 2), 'utf-8')
       return { success: true, data: newModule }
     },
     PUT: async (body) => {
       const profile = getResumeProfile()
       if (!Array.isArray(body)) return { success: false, error: 'modules must be an array' }
-      profile.modules = normalizeResumeModules(body)
+      // 检测前端传入的数组中缺失的内置模块 → 视为用户主动删除
+      // 同时：若用户重新添加了之前删除的模块，从 deleted 列表中移除
+      const incomingIds = new Set(body.map(m => m?.id).filter(Boolean))
+      const deleted = DEFAULT_RESUME_MODULES
+        .filter(def => !incomingIds.has(def.id))
+        .map(def => def.id)
+      profile.deletedBuiltinModules = deleted
+      profile.modules = normalizeResumeModules(body, MODULES_VERSION, deleted)
+      profile.modulesVersion = MODULES_VERSION
       writeFileSync(RESUME_PROFILE_FILE, JSON.stringify(profile, null, 2), 'utf-8')
       return { success: true, data: profile.modules }
     }
@@ -5768,7 +5825,7 @@ const routes = {
     PATCH: async (body, params) => {
       if (params.id === 'paper') return { success: false, error: '该内置模块已停用' }
       const profile = getResumeProfile()
-      const modules = normalizeResumeModules(profile.modules)
+      const modules = normalizeResumeModules(profile.modules, profile.modulesVersion, profile.deletedBuiltinModules)
       const index = modules.findIndex(m => m.id === params.id)
       if (index === -1) return { success: false, error: 'Module not found' }
       modules[index] = { ...modules[index], ...body }
@@ -5778,10 +5835,17 @@ const routes = {
     },
     DELETE: async (_, params) => {
       const profile = getResumeProfile()
-      const modules = normalizeResumeModules(profile.modules)
+      const modules = normalizeResumeModules(profile.modules, profile.modulesVersion, profile.deletedBuiltinModules)
+      const target = modules.find(m => m.id === params.id)
+      if (!target) return { success: false, error: 'Module not found' }
       const filtered = modules.filter(m => m.id !== params.id)
-      if (filtered.length === modules.length) return { success: false, error: 'Module not found' }
       profile.modules = filtered
+      // 记录被删除的内置模块，防止 normalizeResumeModules 重新注入
+      if (target.type === 'builtin') {
+        const deleted = Array.isArray(profile.deletedBuiltinModules) ? [...profile.deletedBuiltinModules] : []
+        if (!deleted.includes(params.id)) deleted.push(params.id)
+        profile.deletedBuiltinModules = deleted
+      }
       writeFileSync(RESUME_PROFILE_FILE, JSON.stringify(profile, null, 2), 'utf-8')
       return { success: true }
     }
@@ -6297,6 +6361,13 @@ const routes = {
 
       const profile = getResumeProfile()
       const resume = await buildTailoredResume(job, profile, provider)
+      if (Array.isArray(resume.skills) && resume.skills.length > 0) {
+        try {
+          const currentProfile = getResumeProfile()
+          currentProfile.generated_skill_groups = resume.skills
+          writeFileSync(RESUME_PROFILE_FILE, JSON.stringify(currentProfile, null, 2), 'utf-8')
+        } catch (e) { console.error('Failed to save skill groups:', e.message) }
+      }
       return { success: true, data: resume }
     }
   },
@@ -6317,6 +6388,14 @@ const routes = {
       const htmlName = artifactNames.html
       const htmlPath = `${PROJECT_ROOT}/tmp/${htmlName}`
       const resume = await buildTailoredResume(job, profile, body.provider)
+      // Save AI-generated skill groups back to profile for preview sync
+      if (Array.isArray(resume.skills) && resume.skills.length > 0) {
+        try {
+          const currentProfile = getResumeProfile()
+          currentProfile.generated_skill_groups = resume.skills
+          writeFileSync(RESUME_PROFILE_FILE, JSON.stringify(currentProfile, null, 2), 'utf-8')
+        } catch (e) { console.error('Failed to save skill groups:', e.message) }
+      }
       writeFileSync(htmlPath, buildResumeHtml(resume), 'utf-8')
       await execFileAsync('node', ['scripts/cv/generate-pdf.mjs', `tmp/${htmlName}`, `output/${fileName}`, '--format=a4'], { cwd: PROJECT_ROOT })
       return { success: true, data: { fileName, path: `output/${fileName}` } }
@@ -6393,7 +6472,7 @@ const routes = {
           const awardSet = new Set(existingList)
           for (const a of newList) awardSet.add(a)
           const mergedAwards = Array.from(awardSet).join('；')
-          const modules = normalizeResumeModules(merged.modules)
+          const modules = normalizeResumeModules(merged.modules, merged.modulesVersion, merged.deletedBuiltinModules)
           const awardsIdx = modules.findIndex(m => m.id === 'awards')
           if (awardsIdx >= 0) {
             modules[awardsIdx].content = mergedAwards
@@ -6456,6 +6535,85 @@ ${existingContext}
         }
       } catch (error) {
         return { success: false, error: `AI 补全失败：${error.message}` }
+      }
+    }
+  },
+  '/api/resume/skill-groups': {
+    POST: async (body) => {
+      const profile = getResumeProfile()
+      const skills = profile.skills || ''
+      if (!skills) return { success: false, error: '请先填写核心能力' }
+
+      const provider = body?.provider || process.env.AI_RESUME_PROVIDER || process.env.AI_EVAL_PROVIDER || 'deepseek'
+      const projectsSummary = (profile.projects || []).map(p =>
+        `${p.name}（${p.tech_stack || ''}）：${(p.description || '').split('\n').filter(Boolean).join('；')}`
+      ).join('\n')
+
+      const prompt = `你是一位严谨的中文简历优化专家。请将以下核心技能归为3-4类。分类标题根据技能领域动态生成。
+
+必须只输出 JSON 对象，不要 Markdown，不要代码块。JSON schema:
+{
+  "skill_groups": [
+    {
+      "group": "分类标题",
+      "items": ["技能标签1", "技能标签2"]
+    }
+  ]
+}
+
+要求：
+1. 只能使用下方"核心能力"中列出的技能，不得编造或添加任何新技能
+2. 将已有技能合理归类，每个技能原文保留，不要改写
+3. 每个分类下2-4个标签
+4. 分类标题根据技能内容动态生成（如"通信协议"、"实时操作系统"、"电源控制"等）
+
+核心能力：
+${skills}
+
+候选人项目经历（仅作分类参考）：
+${projectsSummary || '无'}`
+
+      try {
+        const response = await callChatCompletions(provider, prompt, { temperature: 0.25, maxTokens: 8000 })
+        const parsed = extractJsonValue(response.content)
+        let groups = []
+        if (Array.isArray(parsed.skill_groups) && parsed.skill_groups.length > 0) {
+          groups = parsed.skill_groups.map(g => ({
+            group: g.group,
+            items: (Array.isArray(g.items) ? g.items : []).filter(Boolean)
+          })).filter(g => g.group && g.items.length > 0)
+        }
+        // Validate: every item must exist in the original skills string
+        const skillSet = new Set(skills.split(/[、,，|]/).map(s => s.trim().toLowerCase()).filter(Boolean))
+        const validGroups = groups.map(g => ({
+          ...g,
+          items: g.items.filter(item => skillSet.has(item.trim().toLowerCase()))
+        })).filter(g => g.items.length > 0)
+
+        if (validGroups.length === 0) {
+          // Fallback: local grouping without AI
+          const items = skills.split(/[、,，|]/).map(s => s.trim()).filter(Boolean)
+          const groups = [{ group: '', items }]
+          const currentProfile = getResumeProfile()
+          currentProfile.generated_skill_groups = groups
+          writeFileSync(RESUME_PROFILE_FILE, JSON.stringify(currentProfile, null, 2), 'utf-8')
+          return { success: true, data: groups }
+        }
+
+        const currentProfile = getResumeProfile()
+        currentProfile.generated_skill_groups = validGroups
+        writeFileSync(RESUME_PROFILE_FILE, JSON.stringify(currentProfile, null, 2), 'utf-8')
+        return { success: true, data: validGroups }
+      } catch (error) {
+        // Fallback: local grouping
+        const items = skills.split(/[、,，|]/).map(s => s.trim()).filter(Boolean)
+        const groups = [{ group: '', items }]
+        try {
+          const currentProfile = getResumeProfile()
+          currentProfile.generated_skill_groups = groups
+          writeFileSync(RESUME_PROFILE_FILE, JSON.stringify(currentProfile, null, 2), 'utf-8')
+        } catch {}
+        return { success: true, data: groups }
       }
     }
   },
