@@ -73,10 +73,9 @@ export const resumeAPI = {
   deleteModule: (id) => unwrap(axios.delete(`${API_BASE}/resume/modules/${id}`)),
   deleteFile: (path) => unwrap(axios.delete(`${API_BASE}/resume/delete-file`, { data: { path } })),
   generate: (params) => unwrap(axios.post(`${API_BASE}/resume/generate`, params)),
-  getVersions: () => unwrap(axios.get(`${API_BASE}/resume/files`)),
-  getVersion: (id) => unwrap(axios.get(`${API_BASE}/resume/files/${id}`)),
-  deleteVersion: (id) => unwrap(axios.delete(`${API_BASE}/resume/files/${id}`)),
-  deleteAllVersions: () => unwrap(axios.delete(`${API_BASE}/resume/files`)),
+  getVersions: () => unwrap(axios.get(`${API_BASE}/resume/versions`)),
+  getVersion: (id) => unwrap(axios.get(`${API_BASE}/resume/versions/${id}`)),
+  deleteVersion: (id) => unwrap(axios.delete(`${API_BASE}/resume/versions/${id}`)),
   autoFill: (data) => unwrap(axios.post(`${API_BASE}/resume/auto-fill`, data)),
   bulkImport: (data) => unwrap(axios.post(`${API_BASE}/resume/bulk-import`, data))
 }

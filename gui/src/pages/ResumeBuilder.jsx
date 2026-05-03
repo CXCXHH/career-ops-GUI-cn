@@ -1012,6 +1012,8 @@ export default function ResumeBuilder({ onToast }) {
   const [bulkImportOpen, setBulkImportOpen] = useState(false)
   const [bulkImportText, setBulkImportText] = useState('')
   const [isBulkImporting, setIsBulkImporting] = useState(false)
+  const [versions, setVersions] = useState([])
+  const [selectedVersion, setSelectedVersion] = useState(null)
 
   const triggerBulkImport = async () => {
     if (!bulkImportText.trim()) { showToast(onToast, '请先粘贴要导入的资料内容', 'error'); return }
@@ -1039,6 +1041,7 @@ export default function ResumeBuilder({ onToast }) {
     fetchProfile()
     fetchModules()
     fetchResumeFiles()
+    fetchVersions()
   }, [])
 
   const fetchJobs = async () => {
@@ -1083,6 +1086,15 @@ export default function ResumeBuilder({ onToast }) {
       setResumeFiles(res.data || [])
     } catch (error) {
       console.error('Resume files fetch error:', error)
+    }
+  }
+
+  const fetchVersions = async () => {
+    try {
+      const res = await resumeAPI.getVersions()
+      setVersions(res.data || [])
+    } catch (error) {
+      console.error('Resume versions fetch error:', error)
     }
   }
 
@@ -1427,6 +1439,7 @@ export default function ResumeBuilder({ onToast }) {
     try {
       const res = await jobsAPI.generatePdf(selectedJob, selectedProvider)
       setResumeFiles(prev => [res.data, ...prev])
+      fetchVersions()
       showToast(onToast, `PDF 简历生成成功：${res.data.fileName}`, 'success')
     } catch (error) {
       showToast(onToast, '生成失败', 'error')
@@ -1448,6 +1461,27 @@ export default function ResumeBuilder({ onToast }) {
         return
       }
       showToast(onToast, `删除失败：${displayName}`, 'error')
+    }
+  }
+
+  const handleLoadVersion = async (versionId) => {
+    if (!versionId) { setSelectedVersion(null); return }
+    try {
+      const res = await resumeAPI.getVersion(versionId)
+      setSelectedVersion(res.data)
+    } catch (error) {
+      showToast(onToast, '加载版本失败', 'error')
+    }
+  }
+
+  const handleDeleteVersion = async (versionId) => {
+    try {
+      await resumeAPI.deleteVersion(versionId)
+      setVersions(prev => prev.filter(v => v.id !== versionId))
+      if (selectedVersion?.id === versionId) setSelectedVersion(null)
+      showToast(onToast, '版本已删除', 'success')
+    } catch (error) {
+      showToast(onToast, '删除版本失败', 'error')
     }
   }
 
@@ -1781,7 +1815,7 @@ export default function ResumeBuilder({ onToast }) {
         <LiquidCard>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: '200px' }}>
-              <select value={selectedJob || ''} onChange={(e) => setSelectedJob(e.target.value ? Number(e.target.value) : null)} className="form-control">
+              <select value={selectedJob || ''} onChange={(e) => setSelectedJob(e.target.value || null)} className="form-control">
                 <option value="">选择目标岗位（可选）</option>
                 {jobs.map(job => <option key={job.id} value={job.id}>{job.company} — {job.title}</option>)}
               </select>
@@ -1810,6 +1844,78 @@ export default function ResumeBuilder({ onToast }) {
           )}
         </LiquidCard>
       </ScrollReveal>
+
+      {/* ── 定制版本 ── */}
+      {versions.length > 0 && (
+        <ScrollReveal delay={0.3}>
+          <LiquidCard>
+            <div className="card-header">
+              <div className="card-title">定制版本（{versions.length}）</div>
+            </div>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: selectedVersion ? '16px' : '0' }}>
+              <select
+                value={selectedVersion?.id || ''}
+                onChange={(e) => handleLoadVersion(e.target.value)}
+                className="form-control"
+                style={{ flex: 1 }}
+              >
+                <option value="">选择版本查看...</option>
+                {versions.map(v => (
+                  <option key={v.id} value={v.id}>
+                    {v.company || '未知公司'} — {v.title || '未知岗位'}（{new Date(v.created_at).toLocaleDateString('zh-CN')}）
+                  </option>
+                ))}
+              </select>
+            </div>
+            {selectedVersion && (
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+                    {selectedVersion.company} — {selectedVersion.title}
+                  </span>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {selectedVersion.pdf_file && (
+                      <a href={`/output/${selectedVersion.pdf_file}`} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
+                        <FileText size={14} style={{ marginRight: '4px' }} />PDF
+                      </a>
+                    )}
+                    <button onClick={() => handleDeleteVersion(selectedVersion.id)} style={{ background: 'none', border: '1px solid var(--danger-color)', cursor: 'pointer', color: 'var(--danger-color)', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Trash size={14} />删除
+                    </button>
+                  </div>
+                </div>
+                {selectedVersion.resume?.summary && (
+                  <div style={{ marginBottom: '8px' }}>
+                    <span style={{ fontWeight: 500 }}>定位：</span>{selectedVersion.resume.summary}
+                  </div>
+                )}
+                {selectedVersion.resume?.skills && (
+                  <div style={{ marginBottom: '8px' }}>
+                    <span style={{ fontWeight: 500 }}>技能：</span>
+                    {typeof selectedVersion.resume.skills === 'string'
+                      ? selectedVersion.resume.skills
+                      : Array.isArray(selectedVersion.resume.skills)
+                        ? selectedVersion.resume.skills.map(g => g.group ? `${g.group}: ${(g.items || []).join('、')}` : '').filter(Boolean).join('；')
+                        : ''}
+                  </div>
+                )}
+                {Array.isArray(selectedVersion.resume?.projects) && selectedVersion.resume.projects.length > 0 && (
+                  <div style={{ marginBottom: '8px' }}>
+                    <span style={{ fontWeight: 500 }}>项目：</span>
+                    {selectedVersion.resume.projects.map(p => p.title || p.name).filter(Boolean).join('、')}
+                  </div>
+                )}
+                {Array.isArray(selectedVersion.resume?.gaps) && selectedVersion.resume.gaps.length > 0 && (
+                  <div style={{ color: 'var(--warning-color)' }}>
+                    <span style={{ fontWeight: 500 }}>差距：</span>
+                    {selectedVersion.resume.gaps.join('；')}
+                  </div>
+                )}
+              </div>
+            )}
+          </LiquidCard>
+        </ScrollReveal>
+      )}
 
       {/* ─ 生成文件 ── */}
       {resumeFiles.length > 0 && (

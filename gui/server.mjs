@@ -2817,37 +2817,6 @@ async function buildTailoredResume(job, profile, provider) {
       if (validation.warnings.length) console.warn('AI project validation warnings:', validation.warnings.join('; '))
       projects.push(...aiProjects)
 
-      // 回写 AI 生成的项目到 resume-profile.json，标记 ai_generated
-      try {
-        const aiProjectsForProfile = aiProjects.map(ap => ({
-          name: ap.title.replace(/\s*\|\s*个人项目$/, '').trim(),
-          role: ap.role || '个人项目',
-          start_date: (ap.time.match(/^(\d{4}-\d{2})/) || [])[1] || '',
-          end_date: ap.time.includes('至今') ? '' : (ap.time.match(/至\s*(\d{4}-\d{2})/) || [])[1] || '',
-          tech_stack: ap.stack || '',
-          description: (ap.bullets || []).join('；\n') + '；',
-          ai_generated: true,
-          ai_target_job: `${job.company || ''} - ${job.title || ''}`,
-          ai_generation_reason: (ap.metadata?.business_scenario || projectPlan.new_projects[0]?.business_scenario || '补足岗位项目证据'),
-          ai_domain: ap.metadata?.domain || context.inferred.domain.primary,
-          ai_project_type: ap.metadata?.project_type || 'new_portfolio',
-          ai_truth_level: ap.metadata?.truth_level || 'gap_bridging',
-          ai_source_project_id: '',
-          ai_risk_notes: ap.metadata?.risk_notes || [],
-          ai_generated_at: new Date().toISOString()
-        }))
-        // 追加而非替换，避免覆盖用户自填项目
-        const currentProfile = getResumeProfile()
-        const existingNames = new Set((currentProfile.projects || []).map(p => p.name))
-        const newAiProjects = aiProjectsForProfile.filter(p => !existingNames.has(p.name))
-        if (newAiProjects.length > 0) {
-          currentProfile.projects = [...(currentProfile.projects || []), ...newAiProjects]
-          writeFileSync(RESUME_PROFILE_FILE, JSON.stringify(currentProfile, null, 2), 'utf-8')
-        }
-      } catch (writeErr) {
-        console.error('Failed to write AI projects back to profile:', writeErr.message)
-      }
-
       // Re-sort by time after adding AI projects
       projects.sort((a, b) => {
         const parseTime = (t) => {
@@ -2944,29 +2913,30 @@ AI评分简历策略建议：
 ${resumeStrategy || '无'}`
     : ''
 
-  const prompt = `你是一位严谨的中文简历优化专家。请根据【目标岗位描述（JD）】和【候选人材料】，提取最重要的核心技能标签，并将其归为3-4类。分类标题必须根据岗位领域动态生成。
+  const prompt = `你是一位严谨的中文简历优化专家。请根据【目标岗位描述（JD）】和【候选人材料】，从候选人**已有的技能和经历**中提取最重要的核心技能标签，并将其归为3-4类。分类标题必须根据岗位领域动态生成。
 
 必须只输出 JSON 对象，不要 Markdown，不要代码块。JSON schema:
 {
-  "skill_groups": [
+  “skill_groups”: [
     {
-      "group": "分类标题",
-      "items": [
-        {"name": "技能标签", "evidence": "证据来源", "confidence": "high|medium|low"}
+      “group”: “分类标题”,
+      “items”: [
+        {“name”: “技能标签”, “evidence”: “证据来源”, “confidence”: “high|medium|low”}
       ]
     }
   ],
-  "do_not_claim": ["不能声称的能力"]
+  “do_not_claim”: [“不能声称的能力”]
 }
 
-要求：
-1. 每个技能标签要简洁（10-20字），并列技术用中文顿号"、"分隔，不要用斜杠"/"
-2. 技能必须与岗位强相关，优先突出岗位JD中明确要求的技术
-3. 必须标注 evidence 和 confidence；无证据的能力只能作为 low confidence，不得写成“精通”
-4. 如果用户自填了核心能力，确保覆盖其中的关键技能
-5. 仔细参考AI评分结果中的"差距"和"简历策略"，但不得把 gap 写成已掌握
-6. 每个分类下2-4个标签，总计不超过12个标签
-7. 不得输出"相关技术栈1"、"开发工具链"这类模板词
+【硬性红线——违反即视为错误】：
+1. 每个技能标签必须有明确的证据来源（用户自填技能、项目经历、工作经历）。没有证据的技能不得出现在输出中。
+2. 禁止根据 JD 推测或补充候选人未提及的技能。JD 仅用于”排序优先级”——优先展示与 JD 重合的已有技能，而非补充新技能。
+3. 如果候选人技能与 JD 要求差距较大，只能如实展示已有技能，不得”帮”候选人补全。
+4. 不得把 AI 评分中的 gaps（差距项）写成候选人已掌握的技能。
+5. 如果用户自填了核心能力，必须确保覆盖其中的关键技能。
+6. 每个技能标签要简洁（10-20字），并列技术用中文顿号”、”分隔，不要用斜杠”/”
+7. 每个分类下2-4个标签，总计不超过12个标签
+8. 不得输出”相关技术栈1”、”开发工具链”这类模板词
 
 岗位：${company} - ${role}
 岗位领域：${domain.label} (${domain.primary})，识别信号：${domain.signals.join('、') || '无'}
@@ -6194,7 +6164,7 @@ const routes = {
       const jobs = readJsonl(JOBS_FILE)
       const job = jobs.find(j => j.id === params.id)
       if (!job) return { success: false, error: 'Job not found' }
-      
+
       const date = new Date().toISOString().split('T')[0]
       const profile = getResumeProfile()
       const stem = resumeFileStem(job, profile, date)
@@ -6208,7 +6178,33 @@ const routes = {
       const resume = await buildTailoredResume(job, profile, body.provider)
       writeFileSync(htmlPath, buildResumeHtml(resume), 'utf-8')
       await execFileAsync('node', ['scripts/cv/generate-pdf.mjs', `tmp/${htmlName}`, `output/${fileName}`, '--format=a4'], { cwd: PROJECT_ROOT })
-      return { success: true, data: { fileName, path: `output/${fileName}` } }
+
+      // Save tailored version JSON alongside the PDF
+      const versionsDir = `${PROJECT_ROOT}/data/job-radar/resume-versions`
+      if (!existsSync(versionsDir)) mkdirSync(versionsDir, { recursive: true })
+      const versionId = `${stem}-${Date.now()}`
+      const versionData = {
+        id: versionId,
+        job_id: job.id || '',
+        company: job.company || '',
+        title: job.title || '',
+        provider: body.provider || '',
+        created_at: new Date().toISOString(),
+        pdf_file: fileName,
+        resume: {
+          profile: { full_name: profile.full_name, target_role: profile.target_role, phone: profile.phone, email: profile.email, github: profile.github, location: profile.location, wechat: profile.wechat, gender: profile.gender, age: profile.age, graduation: profile.graduation },
+          summary: resume.summary,
+          skills: resume.skills,
+          education: resume.education,
+          experience: resume.experience,
+          projects: resume.projects,
+          gaps: resume.gaps,
+          modules: resume.modules,
+        }
+      }
+      writeFileSync(`${versionsDir}/${versionId}.json`, JSON.stringify(versionData, null, 2), 'utf-8')
+
+      return { success: true, data: { fileName, path: `output/${fileName}`, version_id: versionId } }
     }
   },
   '/api/jobs/:id/resume/files': {
@@ -6244,6 +6240,34 @@ const routes = {
   '/api/resume/files': {
     GET: async () => {
       return { success: true, data: listGeneratedResumeFiles() }
+    }
+  },
+  '/api/resume/versions': {
+    GET: async () => {
+      const dir = `${PROJECT_ROOT}/data/job-radar/resume-versions`
+      if (!existsSync(dir)) return { success: true, data: [] }
+      const files = readdirSync(dir).filter(f => f.endsWith('.json')).sort().reverse()
+      const versions = files.map(f => {
+        try {
+          const data = JSON.parse(readFileSync(`${dir}/${f}`, 'utf-8'))
+          return { id: data.id, company: data.company, title: data.title, created_at: data.created_at, pdf_file: data.pdf_file }
+        } catch { return null }
+      }).filter(Boolean)
+      return { success: true, data: versions }
+    }
+  },
+  '/api/resume/versions/:id': {
+    GET: async (_, params) => {
+      const filePath = `${PROJECT_ROOT}/data/job-radar/resume-versions/${params.id}.json`
+      if (!existsSync(filePath)) return { success: false, error: '版本不存在' }
+      const data = JSON.parse(readFileSync(filePath, 'utf-8'))
+      return { success: true, data }
+    },
+    DELETE: async (_, params) => {
+      const filePath = `${PROJECT_ROOT}/data/job-radar/resume-versions/${params.id}.json`
+      if (!existsSync(filePath)) return { success: false, error: '版本不存在' }
+      unlinkSync(filePath)
+      return { success: true }
     }
   },
   '/api/resume/photo': {
