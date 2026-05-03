@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { Plus, PencilSimple, Trash, MagnifyingGlass, Buildings, Globe, Tag, MapPin, CheckSquare, Square, Warning, X, Spinner } from '@phosphor-icons/react'
 import { companiesAPI } from '../api'
 import { PageTransition, LiquidSectionHeader, LiquidCard, MagneticButton } from '../components/LiquidMotion'
-import '../styles/liquid-motion.css'
 
 export default function Companies({ onToast }) {
   const [companies, setCompanies] = useState([])

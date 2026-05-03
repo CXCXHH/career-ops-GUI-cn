@@ -4,7 +4,6 @@ import { Link } from 'react-router-dom'
 import { healthAPI, jobsAPI, trackerAPI } from '../api'
 import { showToast } from '../utils/toast'
 import { FluidCanvas, LiquidCard, PageTransition, LiquidSectionHeader, MagneticButton, ScrollReveal } from '../components/LiquidMotion'
-import '../styles/liquid-motion.css'
 
 export default function Dashboard({ onToast }) {
   const [healthStatus, setHealthStatus] = useState(null)

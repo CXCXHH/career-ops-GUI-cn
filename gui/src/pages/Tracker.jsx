@@ -3,7 +3,6 @@ import { ListChecks, Bell, PencilSimple, Trash, CheckSquare, Square, ArrowClockw
 import { trackerAPI, jobsAPI, followupsAPI } from '../api'
 import { showToast } from '../utils/toast'
 import { PageTransition, LiquidSectionHeader, LiquidCard, MagneticButton } from '../components/LiquidMotion'
-import '../styles/liquid-motion.css'
 
 const TRACKER_STATUS_LABELS = {
   Evaluated: '已评估', Applied: '已投递', Responded: '已回复',

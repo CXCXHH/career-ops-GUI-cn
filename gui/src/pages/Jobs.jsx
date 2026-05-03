@@ -3,7 +3,6 @@ import { FileText, ArrowsClockwise, Trash, Eye, ArrowSquareOut, CheckCircle, War
 import { aiAPI, jobsAPI, discoveryAPI } from '../api'
 import { showToast } from '../utils/toast'
 import { PageTransition, LiquidSectionHeader, LiquidCard, MagneticButton } from '../components/LiquidMotion'
-import '../styles/liquid-motion.css'
 
 export default function Jobs({ onToast }) {
   const [jobs, setJobs] = useState([])
