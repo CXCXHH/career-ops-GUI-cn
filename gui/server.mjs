@@ -699,7 +699,7 @@ function getAiProviderConfig(provider) {
       label: 'DeepSeek',
       apiKey: process.env.DEEPSEEK_API_KEY,
       baseUrl: (process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com').replace(/\/$/, ''),
-      model: process.env.DEEPSEEK_MODEL || 'deepseek-v4-pro'
+      model: process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash'
     }
   }
   if (normalized === 'doubao' || normalized === 'ark') {
@@ -735,7 +735,7 @@ function getAiSettings() {
       configured: Boolean(process.env.DEEPSEEK_API_KEY),
       apiKeyMasked: maskSecret(process.env.DEEPSEEK_API_KEY || ''),
       baseUrl: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
-      model: process.env.DEEPSEEK_MODEL || 'deepseek-v4-pro'
+      model: process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash'
     },
     doubao: {
       configured: Boolean(process.env.ARK_API_KEY || process.env.DOUBAO_API_KEY),
@@ -751,7 +751,7 @@ function saveAiSettings(settings) {
   if (settings.deepseek) {
     if ('apiKey' in settings.deepseek && settings.deepseek.apiKey) updates.DEEPSEEK_API_KEY = settings.deepseek.apiKey.trim()
     if ('baseUrl' in settings.deepseek) updates.DEEPSEEK_BASE_URL = (settings.deepseek.baseUrl || 'https://api.deepseek.com').trim()
-    if ('model' in settings.deepseek) updates.DEEPSEEK_MODEL = (settings.deepseek.model || 'deepseek-v4-pro').trim()
+    if ('model' in settings.deepseek) updates.DEEPSEEK_MODEL = (settings.deepseek.model || 'deepseek-v4-flash').trim()
   }
   if (settings.doubao) {
     if ('apiKey' in settings.doubao && settings.doubao.apiKey) updates.ARK_API_KEY = settings.doubao.apiKey.trim()

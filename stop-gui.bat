@@ -33,4 +33,5 @@ echo Frontend port: 5173
 echo Backend port : 3001
 echo ==============================================
 echo.
-pause
+echo This window will close automatically in 3 seconds...
+timeout /t 3 /nobreak >nul

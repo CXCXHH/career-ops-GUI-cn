@@ -8,7 +8,7 @@ import '../styles/liquid-motion.css'
 export default function Settings({ onToast }) {
   const [aiSettings, setAiSettings] = useState(null)
   const [aiForm, setAiForm] = useState({
-    deepseek: { apiKey: '', baseUrl: 'https://api.deepseek.com', model: 'deepseek-v4-pro' },
+    deepseek: { apiKey: '', baseUrl: 'https://api.deepseek.com', model: 'deepseek-v4-flash' },
     doubao: { apiKey: '', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-seed-1-6-251015' }
   })
   const [isSavingAi, setIsSavingAi] = useState(false)

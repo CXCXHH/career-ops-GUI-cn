@@ -47,12 +47,21 @@ if errorlevel 1 (
 
 echo.
 echo [2/4] Starting API server...
-start "Career-Ops-GUI-cn API" /min cmd /k "cd /d ""%ROOT%"" && node gui/server.mjs"
+if not exist "%ROOT%logs" mkdir "%ROOT%logs"
+echo Set WshShell = CreateObject("WScript.Shell") > "%TEMP%\start-api.vbs"
+echo WshShell.Run "cmd /c cd /d ""%ROOT%"" && node gui/server.mjs > ""%ROOT%logs\api.log"" 2> ""%ROOT%logs\api.err.log""", 0, False >> "%TEMP%\start-api.vbs"
+cscript //nologo "%TEMP%\start-api.vbs"
+del "%TEMP%\start-api.vbs"
+echo       API server started (logs: logs\api.log)
 
 timeout /t 3 /nobreak >nul
 
 echo [3/4] Starting frontend server...
-start "Career-Ops-GUI-cn Frontend" /min cmd /k "cd /d ""%ROOT%gui"" && npm run dev"
+echo Set WshShell = CreateObject("WScript.Shell") > "%TEMP%\start-frontend.vbs"
+echo WshShell.Run "cmd /c cd /d ""%ROOT%gui"" && npm run dev > ""%ROOT%logs\frontend.log"" 2> ""%ROOT%logs\frontend.err.log""", 0, False >> "%TEMP%\start-frontend.vbs"
+cscript //nologo "%TEMP%\start-frontend.vbs"
+del "%TEMP%\start-frontend.vbs"
+echo       Frontend server started (logs: logs\frontend.log)
 
 timeout /t 5 /nobreak >nul
 
@@ -64,7 +73,9 @@ echo ==============================================
 echo Start finished.
 echo Frontend: http://localhost:5173
 echo Backend : http://localhost:3001
+echo Logs    : %ROOT%logs\ (api.log / frontend.log)
 echo If the page is not ready yet, wait a few seconds and refresh.
 echo ==============================================
 echo.
-pause
+echo This window will close automatically in 5 seconds...
+timeout /t 5 /nobreak >nul
