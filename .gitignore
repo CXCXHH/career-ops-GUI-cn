@@ -48,6 +48,7 @@ gui/dist/
 node_modules/
 bun.lock
 tmp/
+logs/
 
 # IDE / Editor
 .trae/

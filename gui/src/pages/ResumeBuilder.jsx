@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { FileText, FileImage, CheckCircle, FloppyDisk, Upload, DotsSixVertical, Plus, PencilSimple, PencilSimpleLine, Eye, EyeSlash, X, CaretDown, CaretUp, User, Briefcase, GraduationCap, FolderOpen, ArrowClockwise, Warning, FileArrowUp, Trash, Sparkle } from '@phosphor-icons/react'
+import * as pdfjsLib from 'pdfjs-dist'
 import { aiAPI, jobsAPI, resumeAPI } from '../api'
 import { showToast } from '../utils/toast'
 import { LiquidCard, MagneticButton } from '../components/LiquidMotion'
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`
 
 /* ── 子组件 ── */
 
@@ -574,7 +577,28 @@ function AiAutoFillModal({ isOpen, onClose, section, onFill, onToast }) {
   )
 }
 
-function PreviewModal({ profile, education, experience, projects, modules, photoPreview, onClose }) {
+function PreviewModal({ profile, education, experience, projects, modules, photoPreview, onClose, onProfileUpdate }) {
+  const [skillGroups, setSkillGroups] = useState(() =>
+    Array.isArray(profile.generated_skill_groups) && profile.generated_skill_groups.length > 0
+      ? profile.generated_skill_groups : null
+  )
+  const [loadingSkills, setLoadingSkills] = useState(false)
+
+  useEffect(() => {
+    if (skillGroups || !profile.skills) return
+    let cancelled = false
+    setLoadingSkills(true)
+    resumeAPI.generateSkillGroups().then(res => {
+      if (cancelled) return
+      const groups = res.data
+      if (Array.isArray(groups) && groups.length > 0) {
+        setSkillGroups(groups)
+        if (onProfileUpdate) onProfileUpdate(prev => ({ ...prev, generated_skill_groups: groups }))
+      }
+    }).catch(() => {}).finally(() => { if (!cancelled) setLoadingSkills(false) })
+    return () => { cancelled = true }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const asText = (value) => {
     if (Array.isArray(value)) return value.map(item => String(item || '').trim()).filter(Boolean).join('、')
     return String(value || '').trim()
@@ -644,16 +668,24 @@ function PreviewModal({ profile, education, experience, projects, modules, photo
         ) : null
       case 'skills': {
         const skillsText = asText(profile.skills)
-        if (!skillsText) return null
-        const skillItems = skillsText.split(/[、,，|]/).filter(Boolean)
+        if (!skillsText && !skillGroups) return null
+        const groups = skillGroups && skillGroups.length > 0
+          ? (skillGroups[0]?.group ? skillGroups : [{ group: '', items: skillGroups }])
+          : [{ group: '', items: skillsText.split(/[、,，|]/).filter(Boolean).map(s => s.trim()) }]
         return (
           <section key="skills" className="preview-section">
             {renderSectionTitle('核心能力')}
-            <div className="flex flex-wrap gap-8">
-              {skillItems.map((s, i) => (
-                <span key={i} className="tag">{s.trim()}</span>
-              ))}
-            </div>
+            {loadingSkills && <div className="text-12 text-secondary mb-8">正在生成技能分组...</div>}
+            {groups.map((g, gi) => (
+              <div key={gi} className="mb-8">
+                {g.group && <div className="text-12 text-secondary mb-4">{g.group}</div>}
+                <div className="flex flex-wrap gap-8">
+                  {g.items.map((s, i) => (
+                    <span key={i} className="tag">{s}</span>
+                  ))}
+                </div>
+              </div>
+            ))}
           </section>
         )
       }
@@ -871,6 +903,8 @@ export default function ResumeBuilder({ onToast }) {
   const [selectedVersion, setSelectedVersion] = useState(null)
   const [tailoringResult, setTailoringResult] = useState(null)
   const [isTailoring, setIsTailoring] = useState(false)
+  const [isParsingPdf, setIsParsingPdf] = useState(false)
+  const pdfInputRef = useRef(null)
 
   const basicPhotoSrc = resolvePhotoSrc(profile, photoPreview)
 
@@ -1064,6 +1098,39 @@ export default function ResumeBuilder({ onToast }) {
     } finally { setIsBulkImporting(false) }
   }
 
+  const handlePdfSelect = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.type !== 'application/pdf') {
+      showToast(onToast, '请选择 PDF 文件', 'error')
+      return
+    }
+    setIsParsingPdf(true)
+    try {
+      const arrayBuffer = await file.arrayBuffer()
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+      const textParts = []
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i)
+        const content = await page.getTextContent()
+        const pageText = content.items.map(item => item.str).join(' ')
+        textParts.push(pageText)
+      }
+      const extracted = textParts.join('\n').trim()
+      if (!extracted) {
+        showToast(onToast, '该 PDF 未包含可提取的文字内容', 'error')
+        return
+      }
+      setBulkImportText(extracted)
+      showToast(onToast, `已从 PDF 提取 ${pdf.numPages} 页文字，请确认后点击"开始导入"`, 'success')
+    } catch (err) {
+      showToast(onToast, `PDF 解析失败：${err.message}`, 'error')
+    } finally {
+      setIsParsingPdf(false)
+      if (pdfInputRef.current) pdfInputRef.current.value = ''
+    }
+  }
+
   const confirmImport = () => {
     if (!importPreview) return
     const data = importPreview
@@ -1188,7 +1255,7 @@ export default function ResumeBuilder({ onToast }) {
 
         {/* AI 导入区 */}
         <div className="mb-24 p-20 bg-secondary rounded-12 border-box">
-          <div className="font-500 mb-12 text-14">粘贴资料，AI 提取</div>
+          <div className="font-500 mb-12 text-14">粘贴资料或上传 PDF，AI 提取</div>
           <textarea
             value={bulkImportText}
             onChange={e => setBulkImportText(e.target.value)}
@@ -1198,10 +1265,22 @@ export default function ResumeBuilder({ onToast }) {
             style={{ width: '100%', resize: 'vertical', fontSize: 14, lineHeight: 1.7, marginBottom: 12 }}
           />
           <div className="flex gap-12 items-center flex-between">
-            <select value={selectedProvider} onChange={e => setSelectedProvider(e.target.value)} className="form-control" style={{ width: 200, fontSize: 13 }}>
-              {providers.length === 0 && <option value="deepseek">DeepSeek</option>}
-              {providers.map(p => <option key={p.id} value={p.id} disabled={!p.configured}>{p.label}{p.configured ? ` (${p.model})` : ' (未配置)'}</option>)}
-            </select>
+            <div className="flex gap-12 items-center">
+              <input ref={pdfInputRef} type="file" accept="application/pdf" style={{ display: 'none' }} onChange={handlePdfSelect} />
+              <MagneticButton
+                variant="secondary"
+                onClick={() => pdfInputRef.current?.click()}
+                disabled={isParsingPdf}
+              >
+                {isParsingPdf
+                  ? <><div className="liquid-spinner" style={{ width: 16, height: 16, marginRight: 6, borderWidth: 2 }} />解析中...</>
+                  : <><FileArrowUp size={16} style={{ marginRight: 6 }} />上传 PDF</>}
+              </MagneticButton>
+              <select value={selectedProvider} onChange={e => setSelectedProvider(e.target.value)} className="form-control" style={{ width: 200, fontSize: 13 }}>
+                {providers.length === 0 && <option value="deepseek">DeepSeek</option>}
+                {providers.map(p => <option key={p.id} value={p.id} disabled={!p.configured}>{p.label}{p.configured ? ` (${p.model})` : ' (未配置)'}</option>)}
+              </select>
+            </div>
             <MagneticButton variant="primary" onClick={triggerBulkImport} disabled={isBulkImporting || !bulkImportText.trim()}>
               {isBulkImporting
                 ? <><div className="liquid-spinner" style={{ width: 16, height: 16, marginRight: 6, borderWidth: 2 }} />AI 提取中...</>
@@ -1448,7 +1527,7 @@ export default function ResumeBuilder({ onToast }) {
 
       {/* 模态框 */}
       {aiModal.open && <AiAutoFillModal isOpen={aiModal.open} onClose={closeAiModal} section={aiModal.section} onFill={handleAiFill(aiModal.section)} onToast={onToast} />}
-      {showPreview && <PreviewModal profile={profile} education={education} experience={experience} projects={projects} modules={modules} photoPreview={photoPreview} onClose={() => setShowPreview(false)} />}
+      {showPreview && <PreviewModal profile={profile} education={education} experience={experience} projects={projects} modules={modules} photoPreview={photoPreview} onClose={() => setShowPreview(false)} onProfileUpdate={setProfile} />}
     </div>
   )
 }

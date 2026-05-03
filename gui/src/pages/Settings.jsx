@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Gear } from '@phosphor-icons/react'
+import { Gear, Trash } from '@phosphor-icons/react'
 import { aiAPI } from '../api'
 import { showToast } from '../utils/toast'
 import { PageTransition, LiquidSectionHeader, LiquidCard, MagneticButton } from '../components/LiquidMotion'
@@ -7,11 +7,12 @@ import { PageTransition, LiquidSectionHeader, LiquidCard, MagneticButton } from 
 export default function Settings({ onToast }) {
   const [aiSettings, setAiSettings] = useState(null)
   const [aiForm, setAiForm] = useState({
-    deepseek: { apiKey: '', baseUrl: 'https://api.deepseek.com', model: 'deepseek-v4-pro' },
+    deepseek: { apiKey: '', baseUrl: 'https://api.deepseek.com', model: 'deepseek-v4-flash' },
     doubao: { apiKey: '', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-seed-1-6-251015' }
   })
   const [isSavingAi, setIsSavingAi] = useState(false)
   const [clearingProvider, setClearingProvider] = useState('')
+  const [isResetting, setIsResetting] = useState(false)
 
   useEffect(() => {
     fetchAiSettings()
@@ -96,6 +97,24 @@ export default function Settings({ onToast }) {
       showToast(onToast, `清除失败：${error.message}`, 'error')
     } finally {
       setClearingProvider('')
+    }
+  }
+
+  const handleReset = async () => {
+    if (!window.confirm('确定要初始化系统吗？\n\n将清除：\n• 所有个人简历数据\n• API Key 配置\n• 公司列表、职位记录\n• 求职追踪、面试准备\n• 生成的 PDF 和报告\n\n此操作不可撤销！')) return
+    if (!window.confirm('再次确认：初始化后所有数据将恢复为默认状态，确定继续？')) return
+
+    setIsResetting(true)
+    try {
+      await aiAPI.resetSystem()
+      localStorage.removeItem('interviewPrepCache')
+      localStorage.removeItem('resumeFiles')
+      await fetchAiSettings()
+      showToast(onToast, '系统已初始化，所有数据已恢复为默认状态', 'success')
+    } catch (error) {
+      showToast(onToast, `初始化失败：${error.message}`, 'error')
+    } finally {
+      setIsResetting(false)
     }
   }
 
@@ -209,6 +228,27 @@ export default function Settings({ onToast }) {
               />
             </div>
           </div>
+        </div>
+      </LiquidCard>
+
+      <LiquidCard delay={0.08}>
+        <div className="card-header">
+          <div>
+            <div className="card-title" style={{ color: '#ef4444' }}>系统初始化</div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '4px' }}>
+              清除所有个人数据（简历、公司、职位、追踪记录）、API Key 配置和生成文件，恢复为初始状态。不影响应用功能。
+            </p>
+          </div>
+          <MagneticButton
+            variant="secondary"
+            className="btn-sm"
+            onClick={handleReset}
+            disabled={isResetting}
+            style={{ borderColor: '#ef4444', color: '#ef4444' }}
+          >
+            <Trash style={{ width: '14px', height: '14px', marginRight: '6px' }} />
+            {isResetting ? '重置中...' : '初始化系统'}
+          </MagneticButton>
         </div>
       </LiquidCard>
     </PageTransition>

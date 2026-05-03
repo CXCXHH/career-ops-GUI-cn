@@ -57,7 +57,8 @@ export const aiAPI = {
   getProviders: () => unwrap(axios.get(`${API_BASE}/ai/providers`)),
   getSettings: () => unwrap(axios.get(`${API_BASE}/ai/settings`)),
   saveSettings: (data) => unwrap(axios.post(`${API_BASE}/ai/settings`, data)),
-  clearSettings: (provider) => unwrap(axios.delete(`${API_BASE}/ai/settings/${provider}`))
+  clearSettings: (provider) => unwrap(axios.delete(`${API_BASE}/ai/settings/${provider}`)),
+  resetSystem: () => unwrap(axios.post(`${API_BASE}/system/reset`))
 }
 
 export const resumeAPI = {
@@ -77,7 +78,8 @@ export const resumeAPI = {
   getVersion: (id) => unwrap(axios.get(`${API_BASE}/resume/versions/${id}`)),
   deleteVersion: (id) => unwrap(axios.delete(`${API_BASE}/resume/versions/${id}`)),
   autoFill: (data) => unwrap(axios.post(`${API_BASE}/resume/auto-fill`, data)),
-  bulkImport: (data) => unwrap(axios.post(`${API_BASE}/resume/bulk-import`, data))
+  bulkImport: (data) => unwrap(axios.post(`${API_BASE}/resume/bulk-import`, data)),
+  generateSkillGroups: (provider) => unwrap(axios.post(`${API_BASE}/resume/skill-groups`, { provider }))
 }
 
 export const discoveryAPI = {

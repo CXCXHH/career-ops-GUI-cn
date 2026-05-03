@@ -62,15 +62,45 @@ const TRACKER_TEMPLATE = '# Applications Tracker\n\n| # | Date | Company | Role 
 const DEFAULT_RESUME_MODULES = [
   { id: 'summary', name: '求职定位', type: 'builtin', enabled: true },
   { id: 'skills', name: '核心能力', type: 'builtin', enabled: true },
+  { id: 'education', name: '教育背景', type: 'builtin', enabled: true },
   { id: 'experience', name: '工作经历', type: 'builtin', enabled: true },
   { id: 'projects', name: '项目经历', type: 'builtin', enabled: true },
-  { id: 'education', name: '教育背景', type: 'builtin', enabled: true },
-  { id: 'gaps', name: '针对岗位的补充准备', type: 'builtin', enabled: true }
+  { id: 'gaps', name: '针对岗位的补充准备', type: 'builtin', enabled: false }
 ]
 
-function normalizeResumeModules(modules) {
-  const source = Array.isArray(modules) ? modules : DEFAULT_RESUME_MODULES
-  return source.filter(module => module?.id !== 'paper').map(module => ({ ...module }))
+const MODULES_VERSION = 2 // bump when defaults change
+
+function normalizeResumeModules(modules, modulesVersion, deletedBuiltinModules = []) {
+  const source = Array.isArray(modules) ? modules : []
+  const needsMigration = !modulesVersion || modulesVersion < MODULES_VERSION
+  const deletedSet = new Set(Array.isArray(deletedBuiltinModules) ? deletedBuiltinModules : [])
+
+  const byId = new Map()
+  for (const m of source) {
+    if (m?.id && m.id !== 'paper') byId.set(m.id, { ...m })
+  }
+
+  // 注入缺失的内置模块（使用最新默认值），跳过用户主动删除的
+  for (const def of DEFAULT_RESUME_MODULES) {
+    if (!byId.has(def.id) && !deletedSet.has(def.id)) byId.set(def.id, { ...def })
+  }
+
+  // 老版本数据迁移：默认关闭 gaps 模块（用户可在 UI 手动重新启用）
+  if (needsMigration) {
+    const gaps = byId.get('gaps')
+    if (gaps && gaps.enabled) gaps.enabled = false
+  }
+
+  // 按 DEFAULT_RESUME_MODULES 的顺序输出，再追加自定义模块
+  const defaultOrder = DEFAULT_RESUME_MODULES.map(m => m.id)
+  const ordered = []
+  for (const id of defaultOrder) {
+    if (byId.has(id)) ordered.push(byId.get(id))
+  }
+  for (const [id, m] of byId) {
+    if (!defaultOrder.includes(id)) ordered.push(m)
+  }
+  return ordered
 }
 
 const BUILTIN_RESUME_DATA_MODULES = new Set(['education', 'experience', 'projects'])
@@ -699,7 +729,7 @@ function getAiProviderConfig(provider) {
       label: 'DeepSeek',
       apiKey: process.env.DEEPSEEK_API_KEY,
       baseUrl: (process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com').replace(/\/$/, ''),
-      model: process.env.DEEPSEEK_MODEL || 'deepseek-v4-pro'
+      model: process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash'
     }
   }
   if (normalized === 'doubao' || normalized === 'ark') {
@@ -735,7 +765,7 @@ function getAiSettings() {
       configured: Boolean(process.env.DEEPSEEK_API_KEY),
       apiKeyMasked: maskSecret(process.env.DEEPSEEK_API_KEY || ''),
       baseUrl: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
-      model: process.env.DEEPSEEK_MODEL || 'deepseek-v4-pro'
+      model: process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash'
     },
     doubao: {
       configured: Boolean(process.env.ARK_API_KEY || process.env.DOUBAO_API_KEY),
@@ -751,7 +781,7 @@ function saveAiSettings(settings) {
   if (settings.deepseek) {
     if ('apiKey' in settings.deepseek && settings.deepseek.apiKey) updates.DEEPSEEK_API_KEY = settings.deepseek.apiKey.trim()
     if ('baseUrl' in settings.deepseek) updates.DEEPSEEK_BASE_URL = (settings.deepseek.baseUrl || 'https://api.deepseek.com').trim()
-    if ('model' in settings.deepseek) updates.DEEPSEEK_MODEL = (settings.deepseek.model || 'deepseek-v4-pro').trim()
+    if ('model' in settings.deepseek) updates.DEEPSEEK_MODEL = (settings.deepseek.model || 'deepseek-v4-flash').trim()
   }
   if (settings.doubao) {
     if ('apiKey' in settings.doubao && settings.doubao.apiKey) updates.ARK_API_KEY = settings.doubao.apiKey.trim()
@@ -774,9 +804,15 @@ function clearAiSettings(provider) {
   throw new Error('不支持的 AI Provider')
 }
 
+function isTemplateContent(text) {
+  if (!text) return true
+  const markers = ['[你的', '[Your ', 'jane@example.com', 'Jane Smith', 'janesmith', '+1-555-0123', '[公司名称]', '[职位]', '[职责/成就']
+  return markers.some(m => text.includes(m))
+}
+
 function buildCandidateResumeContext() {
   const cv = readTextIfExists(`${PROJECT_ROOT}/cv.md`, 16000).trim()
-  if (cv) return cv
+  if (cv && !isTemplateContent(cv)) return cv
 
   const profile = getResumeProfile()
   const lines = []
@@ -832,12 +868,16 @@ function buildEvaluableJobDescription(job = {}) {
 
 function buildEvaluationPrompt(job) {
   const candidateResume = buildCandidateResumeContext()
-  const cv = readTextIfExists(`${PROJECT_ROOT}/cv.md`, 16000)
-  const profile = readTextIfExists(`${PROJECT_ROOT}/config/profile.yml`, 8000)
-  const profileMode = readTextIfExists(`${PROJECT_ROOT}/modes/_profile.md`, 10000)
+  const cvRaw = readTextIfExists(`${PROJECT_ROOT}/cv.md`, 16000)
+  const cv = isTemplateContent(cvRaw) ? '' : cvRaw
+  const profileRaw = readTextIfExists(`${PROJECT_ROOT}/config/profile.yml`, 8000)
+  const profile = isTemplateContent(profileRaw) ? '' : profileRaw
+  const profileModeRaw = readTextIfExists(`${PROJECT_ROOT}/modes/_profile.md`, 10000)
+  const profileMode = isTemplateContent(profileModeRaw) ? '' : profileModeRaw
   const sharedMode = readTextIfExists(`${PROJECT_ROOT}/modes/_shared.md`, 10000)
   const ofertaMode = readTextIfExists(`${PROJECT_ROOT}/modes/oferta.md`, 10000)
-  const proofPoints = readTextIfExists(`${PROJECT_ROOT}/article-digest.md`, 10000)
+  const proofPointsRaw = readTextIfExists(`${PROJECT_ROOT}/article-digest.md`, 10000)
+  const proofPoints = isTemplateContent(proofPointsRaw) ? '' : proofPointsRaw
   const jobDescription = buildEvaluableJobDescription(job)
   const jd = [
     `Company: ${job.company || ''}`,
@@ -904,9 +944,12 @@ ${jd}
 
 function buildInterviewPrepPrompt(job) {
   const cv = buildCandidateResumeContext().slice(0, 12000)
-  const profile = readTextIfExists(`${PROJECT_ROOT}/config/profile.yml`, 6000)
-  const profileMode = readTextIfExists(`${PROJECT_ROOT}/modes/_profile.md`, 6000)
-  const proofPoints = readTextIfExists(`${PROJECT_ROOT}/article-digest.md`, 8000)
+  const profileRaw = readTextIfExists(`${PROJECT_ROOT}/config/profile.yml`, 6000)
+  const profile = isTemplateContent(profileRaw) ? '' : profileRaw
+  const profileModeRaw = readTextIfExists(`${PROJECT_ROOT}/modes/_profile.md`, 6000)
+  const profileMode = isTemplateContent(profileModeRaw) ? '' : profileModeRaw
+  const proofPointsRaw = readTextIfExists(`${PROJECT_ROOT}/article-digest.md`, 8000)
+  const proofPoints = isTemplateContent(proofPointsRaw) ? '' : proofPointsRaw
   const resumeProfile = getResumeProfile()
   const domain = inferJobDomain(job, resumeProfile)
   const seniority = inferSeniority(job)
@@ -1923,7 +1966,7 @@ function getDefaultResumeProfile() {
 
 function getResumeProfile() {
   const profile = { ...getDefaultResumeProfile(), ...readJsonFile(RESUME_PROFILE_FILE, {}) }
-  profile.modules = normalizeResumeModules(profile.modules)
+  profile.modules = normalizeResumeModules(profile.modules, profile.modulesVersion, profile.deletedBuiltinModules)
   return profile
 }
 
@@ -1934,7 +1977,7 @@ function saveResumeProfile(profile) {
     ...profile,
     photo_path: profile.photo_path ?? current.photo_path
   }
-  next.modules = normalizeResumeModules(next.modules)
+  next.modules = normalizeResumeModules(next.modules, next.modulesVersion, next.deletedBuiltinModules)
   if (profile.photoData && profile.photoName) {
     const match = String(profile.photoData).match(/^data:(image\/(png|jpeg|jpg));base64,(.+)$/)
     if (!match) throw new Error('照片格式只支持 PNG/JPG')
@@ -2802,7 +2845,7 @@ async function buildTailoredResume(job, profile, provider) {
     ...(projectPlan.weak_job_description ? ['岗位描述不足：当前基于搜索页/有限信息保守生成，建议补充完整 JD 后重新定制。'] : [])
   ].slice(0, 3)
 
-  const modules = normalizeResumeModules(profile.modules)
+  const modules = normalizeResumeModules(profile.modules, profile.modulesVersion, profile.deletedBuiltinModules)
 
   // Use user-filled education from profile, convert to resume format
   const profileEducation = Array.isArray(profile.education) ? profile.education : []
@@ -5506,6 +5549,74 @@ function parseMultipartForm(data) {
   return result
 }
 
+function safeUnlink(filePath) {
+  try { if (existsSync(filePath)) unlinkSync(filePath) } catch {}
+}
+
+function cleanDir(dir, ext) {
+  if (!existsSync(dir)) return
+  try {
+    for (const f of readdirSync(dir)) {
+      if (f === '.gitkeep') continue
+      if (!ext || f.endsWith(ext)) safeUnlink(`${dir}/${f}`)
+    }
+  } catch {}
+}
+
+function resetSystem() {
+  // A. Reset config files to defaults
+  const envExample = `${PROJECT_ROOT}/.env.example`
+  if (existsSync(envExample)) writeFileSync(`${PROJECT_ROOT}/.env`, readFileSync(envExample, 'utf-8'), 'utf-8')
+
+  const profileExample = `${PROJECT_ROOT}/config/profile.example.yml`
+  if (existsSync(profileExample)) writeFileSync(`${PROJECT_ROOT}/config/profile.yml`, readFileSync(profileExample, 'utf-8'), 'utf-8')
+
+  const profileTemplate = `${PROJECT_ROOT}/modes/_profile.template.md`
+  if (existsSync(profileTemplate)) writeFileSync(`${PROJECT_ROOT}/modes/_profile.md`, readFileSync(profileTemplate, 'utf-8'), 'utf-8')
+
+  // Reset portals.yml tracked_companies
+  const portalsPath = `${PROJECT_ROOT}/portals.yml`
+  if (existsSync(portalsPath)) {
+    try {
+      const parsed = yaml.load(readFileSync(portalsPath, 'utf-8')) || {}
+      parsed.tracked_companies = []
+      writeFileSync(portalsPath, yaml.dump(parsed, { lineWidth: -1 }), 'utf-8')
+    } catch {}
+  }
+
+  writeFileSync(`${PROJECT_ROOT}/cv.md`, CV_TEMPLATE, 'utf-8')
+  writeFileSync(TRACKER_FILE, TRACKER_TEMPLATE, 'utf-8')
+  writeFileSync(`${PROJECT_ROOT}/data/pipeline.md`, '## Pendientes\n', 'utf-8')
+  const defaultProfile = {
+    full_name: '', gender: '', age: '', phone: '', email: '', wechat: '',
+    location: '', education: [], graduation: '', target_role: '', summary: '',
+    photo_path: '', github: '', skills: '', experience: [], projects: [],
+    modules: normalizeResumeModules(DEFAULT_RESUME_MODULES)
+  }
+  writeFileSync(RESUME_PROFILE_FILE, JSON.stringify(defaultProfile, null, 2), 'utf-8')
+  writeFileSync(`${PROJECT_ROOT}/data/job-radar/companies.json`, '[]', 'utf-8')
+
+  // B. Delete user data files
+  for (const f of [
+    'data/job-radar/jobs.jsonl', 'data/job-radar/candidates.jsonl',
+    'data/job-radar/deleted-companies.json', 'data/job-radar/discovery-runs.jsonl',
+    'data/job-radar/onboarding-cache.json',
+    'data/job-radar/resume-photo.png', 'data/job-radar/resume-photo.jpg',
+    'data/follow-ups.md', 'data/scan-history.tsv'
+  ]) safeUnlink(`${PROJECT_ROOT}/${f}`)
+
+  cleanDir(`${PROJECT_ROOT}/interview-prep`, null)
+  cleanDir(`${PROJECT_ROOT}/jds`, '.md')
+  cleanDir(`${PROJECT_ROOT}/reports`, '.md')
+  cleanDir(`${PROJECT_ROOT}/output`, null)
+  cleanDir(`${PROJECT_ROOT}/batch/tracker-additions`, '.tsv')
+  cleanDir(`${PROJECT_ROOT}/tmp`, null)
+  cleanDir(`${PROJECT_ROOT}/logs`, null)
+
+  // C. Reload env
+  dotenv.config()
+}
+
 const routes = {
   '/api/onboarding': {
     GET: async () => {
@@ -5524,6 +5635,16 @@ const routes = {
     POST: async (body) => {
       const result = saveOnboardingFiles(body || {})
       return { success: true, data: result }
+    }
+  },
+  '/api/system/reset': {
+    POST: async () => {
+      try {
+        resetSystem()
+        return { success: true, data: { message: '系统已重置为初始状态' } }
+      } catch (error) {
+        return { success: false, error: `重置失败：${error.message}` }
+      }
     }
   },
   '/api/health': {
@@ -5590,11 +5711,11 @@ const routes = {
   '/api/resume/modules': {
     GET: async () => {
       const profile = getResumeProfile()
-      return { success: true, data: normalizeResumeModules(profile.modules) }
+      return { success: true, data: normalizeResumeModules(profile.modules, profile.modulesVersion, profile.deletedBuiltinModules) }
     },
     POST: async (body) => {
       const profile = getResumeProfile()
-      const modules = normalizeResumeModules(profile.modules)
+      const modules = normalizeResumeModules(profile.modules, profile.modulesVersion, profile.deletedBuiltinModules)
       const moduleType = body.type || 'custom'
       if (body.id === 'paper') return { success: false, error: '该内置模块已停用' }
       const newModule = {
@@ -5612,7 +5733,7 @@ const routes = {
     PUT: async (body) => {
       const profile = getResumeProfile()
       if (!Array.isArray(body)) return { success: false, error: 'modules must be an array' }
-      profile.modules = normalizeResumeModules(body)
+      profile.modules = normalizeResumeModules(body, profile.modulesVersion, profile.deletedBuiltinModules)
       writeFileSync(RESUME_PROFILE_FILE, JSON.stringify(profile, null, 2), 'utf-8')
       return { success: true, data: profile.modules }
     }
@@ -5621,7 +5742,7 @@ const routes = {
     PATCH: async (body, params) => {
       if (params.id === 'paper') return { success: false, error: '该内置模块已停用' }
       const profile = getResumeProfile()
-      const modules = normalizeResumeModules(profile.modules)
+      const modules = normalizeResumeModules(profile.modules, profile.modulesVersion, profile.deletedBuiltinModules)
       const index = modules.findIndex(m => m.id === params.id)
       if (index === -1) return { success: false, error: 'Module not found' }
       modules[index] = { ...modules[index], ...body }
@@ -5631,10 +5752,16 @@ const routes = {
     },
     DELETE: async (_, params) => {
       const profile = getResumeProfile()
-      const modules = normalizeResumeModules(profile.modules)
+      const modules = normalizeResumeModules(profile.modules, profile.modulesVersion, profile.deletedBuiltinModules)
       const filtered = modules.filter(m => m.id !== params.id)
       if (filtered.length === modules.length) return { success: false, error: 'Module not found' }
       profile.modules = filtered
+      // Track deleted builtin modules to prevent re-injection
+      const deletedBuiltin = DEFAULT_RESUME_MODULES.find(m => m.id === params.id)
+      if (deletedBuiltin) {
+        profile.deletedBuiltinModules = [...(profile.deletedBuiltinModules || []), params.id]
+      }
+      profile.modulesVersion = MODULES_VERSION
       writeFileSync(RESUME_PROFILE_FILE, JSON.stringify(profile, null, 2), 'utf-8')
       return { success: true }
     }
@@ -6231,6 +6358,85 @@ const routes = {
       const { unlinkSync } = await import('fs')
       unlinkSync(fullPath)
       return { success: true }
+    }
+  },
+  '/api/resume/skill-groups': {
+    POST: async (body) => {
+      const profile = getResumeProfile()
+      const skills = profile.skills || ''
+      if (!skills) return { success: false, error: '请先填写核心能力' }
+
+      const provider = body?.provider || process.env.AI_RESUME_PROVIDER || process.env.AI_EVAL_PROVIDER || 'deepseek'
+      const projectsSummary = (profile.projects || []).map(p =>
+        `${p.name}（${p.tech_stack || ''}）：${(p.description || '').split('\n').filter(Boolean).join('；')}`
+      ).join('\n')
+
+      const prompt = `你是一位严谨的中文简历优化专家。请将以下核心技能归为3-4类。分类标题根据技能领域动态生成。
+
+必须只输出 JSON 对象，不要 Markdown，不要代码块。JSON schema:
+{
+  "skill_groups": [
+    {
+      "group": "分类标题",
+      "items": ["技能标签1", "技能标签2"]
+    }
+  ]
+}
+
+要求：
+1. 只能使用下方"核心能力"中列出的技能，不得编造或添加任何新技能
+2. 将已有技能合理归类，每个技能原文保留，不要改写
+3. 每个分类下2-4个标签
+4. 分类标题根据技能内容动态生成（如"通信协议"、"实时操作系统"、"电源控制"等）
+
+核心能力：
+${skills}
+
+候选人项目经历（仅作分类参考）：
+${projectsSummary || '无'}`
+
+      try {
+        const response = await callChatCompletions(provider, prompt, { temperature: 0.25, maxTokens: 8000 })
+        const parsed = extractJsonValue(response.content)
+        let groups = []
+        if (Array.isArray(parsed.skill_groups) && parsed.skill_groups.length > 0) {
+          groups = parsed.skill_groups.map(g => ({
+            group: g.group,
+            items: (Array.isArray(g.items) ? g.items : []).filter(Boolean)
+          })).filter(g => g.group && g.items.length > 0)
+        }
+        // Validate: every item must exist in the original skills string
+        const skillSet = new Set(skills.split(/[、,，|]/).map(s => s.trim().toLowerCase()).filter(Boolean))
+        const validGroups = groups.map(g => ({
+          ...g,
+          items: g.items.filter(item => skillSet.has(item.trim().toLowerCase()))
+        })).filter(g => g.items.length > 0)
+
+        if (validGroups.length === 0) {
+          // Fallback: local grouping without AI
+          const items = skills.split(/[、,，|]/).map(s => s.trim()).filter(Boolean)
+          const groups = [{ group: '', items }]
+          const currentProfile = getResumeProfile()
+          currentProfile.generated_skill_groups = groups
+          writeFileSync(RESUME_PROFILE_FILE, JSON.stringify(currentProfile, null, 2), 'utf-8')
+          return { success: true, data: groups }
+        }
+
+        const currentProfile = getResumeProfile()
+        currentProfile.generated_skill_groups = validGroups
+        writeFileSync(RESUME_PROFILE_FILE, JSON.stringify(currentProfile, null, 2), 'utf-8')
+        return { success: true, data: validGroups }
+      } catch (error) {
+        // Fallback: local grouping
+        const items = skills.split(/[、,，|]/).map(s => s.trim()).filter(Boolean)
+        const groups = [{ group: '', items }]
+        try {
+          const currentProfile = getResumeProfile()
+          currentProfile.generated_skill_groups = groups
+          writeFileSync(RESUME_PROFILE_FILE, JSON.stringify(currentProfile, null, 2), 'utf-8')
+        } catch {}
+        return { success: true, data: groups }
+      }
     }
   },
   '/api/resume/files': {
