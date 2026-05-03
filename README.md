@@ -134,6 +134,29 @@ API Key 只存在你本机的 `.env` 文件中。
 
 ---
 
+## 前端架构
+
+### 样式管理
+
+所有样式集中在两个文件中：
+
+- `gui/src/styles/variables.css` — CSS 变量（颜色、字体、阴影）
+- `gui/src/styles/index.css` — 全部组件样式 + 工具类
+
+**工具类系统：** 提供 Tailwind 风格的工具类，覆盖布局（flex、grid）、间距（mt、mb、p）、文字（text-12~text-20、font-500~font-700）、颜色（text-primary、text-secondary）等常用模式。页面中优先使用工具类替代内联 `style={{}}`。
+
+**动效：** 使用 framer-motion 的 `LiquidCard`（淡入 + 微悬浮）和 `MagneticButton`（弹性 hover），CSS 仅保留 `transition` 和基础 `@keyframes`（spin、slideIn）。
+
+### 组件结构
+
+- **LiquidCard** (`components/LiquidMotion.jsx`) — 淡入 + hover 悬浮卡片
+- **MagneticButton** (`components/LiquidMotion.jsx`) — 弹性 hover 按钮（`liquid-btn-primary` / `liquid-btn-secondary`）
+- **LiquidSectionHeader** (`components/LiquidMotion.jsx`) — 页面分区标题
+- **PageTransition** (`components/LiquidMotion.jsx`) — 页面切换过渡
+| Toast | `components/Toast.jsx` | 全局通知 |
+
+---
+
 ## 数据格式规范
 
 AI 生成的所有数据遵循统一的渲染规范：
