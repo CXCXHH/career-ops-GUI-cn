@@ -5542,6 +5542,107 @@ function parseMultipartForm(data) {
   return result
 }
 
+function safeUnlink(filePath) {
+  try { if (existsSync(filePath)) unlinkSync(filePath) } catch {}
+}
+
+function cleanDir(dir, ext) {
+  if (!existsSync(dir)) return
+  try {
+    for (const f of readdirSync(dir)) {
+      if (f === '.gitkeep') continue
+      if (!ext || f.endsWith(ext)) safeUnlink(`${dir}/${f}`)
+    }
+  } catch {}
+}
+
+const CV_TEMPLATE = `# CV -- [你的姓名]
+
+**Location:** [你的地点]
+**Email:** [你的邮箱]
+**LinkedIn:** [你的 LinkedIn]
+**Portfolio:** [你的作品集]
+**GitHub:** [你的 GitHub]
+
+## Professional Summary
+
+[你的专业简介]
+
+## Work Experience
+
+### [公司名称] -- [地点]
+**[职位]**
+[时间范围]
+
+- [职责/成就 1]
+- [职责/成就 2]
+- [职责/成就 3]
+
+## Projects
+
+- **[项目名称]** ([类型]) -- [项目描述]
+
+## Education
+
+- [学位], [学校] ([年份])
+`
+
+function resetSystem() {
+  // A. Reset config files to defaults
+  const envExample = `${PROJECT_ROOT}/.env.example`
+  if (existsSync(envExample)) writeFileSync(`${PROJECT_ROOT}/.env`, readFileSync(envExample, 'utf-8'), 'utf-8')
+
+  const profileExample = `${PROJECT_ROOT}/config/profile.example.yml`
+  if (existsSync(profileExample)) writeFileSync(`${PROJECT_ROOT}/config/profile.yml`, readFileSync(profileExample, 'utf-8'), 'utf-8')
+
+  const profileTemplate = `${PROJECT_ROOT}/modes/_profile.template.md`
+  if (existsSync(profileTemplate)) writeFileSync(`${PROJECT_ROOT}/modes/_profile.md`, readFileSync(profileTemplate, 'utf-8'), 'utf-8')
+
+  // Reset portals.yml tracked_companies
+  const portalsPath = `${PROJECT_ROOT}/portals.yml`
+  if (existsSync(portalsPath)) {
+    try {
+      const parsed = yaml.load(readFileSync(portalsPath, 'utf-8')) || {}
+      parsed.tracked_companies = []
+      writeFileSync(portalsPath, yaml.dump(parsed, { lineWidth: -1 }), 'utf-8')
+    } catch {}
+  }
+
+  writeFileSync(`${PROJECT_ROOT}/cv.md`, CV_TEMPLATE, 'utf-8')
+  writeFileSync(TRACKER_FILE, TRACKER_TEMPLATE, 'utf-8')
+  writeFileSync(`${PROJECT_ROOT}/data/pipeline.md`, '## Pendientes\n', 'utf-8')
+  const defaultProfile = {
+    full_name: '', gender: '', age: '', phone: '', email: '', wechat: '',
+    location: '', education: [], graduation: '', target_role: '', summary: '',
+    photo_path: '', github: '', skills: '', experience: [], projects: [],
+    modules: normalizeResumeModules(DEFAULT_RESUME_MODULES)
+  }
+  writeFileSync(RESUME_PROFILE_FILE, JSON.stringify(defaultProfile, null, 2), 'utf-8')
+  writeFileSync(`${PROJECT_ROOT}/data/job-radar/companies.json`, '[]', 'utf-8')
+
+  // B. Delete user data files
+  for (const f of [
+    'data/job-radar/jobs.jsonl', 'data/job-radar/candidates.jsonl',
+    'data/job-radar/deleted-companies.json', 'data/job-radar/discovery-runs.jsonl',
+    'data/job-radar/onboarding-cache.json',
+    'data/job-radar/resume-photo.png', 'data/job-radar/resume-photo.jpg',
+    'data/follow-ups.md', 'data/scan-history.tsv'
+  ]) safeUnlink(`${PROJECT_ROOT}/${f}`)
+
+  cleanDir(`${PROJECT_ROOT}/interview-prep`, null)
+  cleanDir(`${PROJECT_ROOT}/jds`, '.md')
+  cleanDir(`${PROJECT_ROOT}/reports`, '.md')
+  cleanDir(`${PROJECT_ROOT}/output`, null)
+  cleanDir(`${PROJECT_ROOT}/batch/tracker-additions`, '.tsv')
+  cleanDir(`${PROJECT_ROOT}/tmp`, null)
+  cleanDir(`${PROJECT_ROOT}/logs`, null)
+
+  // C. Reload env
+  const envKeys = ['DEEPSEEK_API_KEY', 'DEEPSEEK_BASE_URL', 'DEEPSEEK_MODEL', 'ARK_API_KEY', 'ARK_BASE_URL', 'ARK_MODEL', 'GEMINI_API_KEY']
+  for (const k of envKeys) delete process.env[k]
+  loadDotEnv()
+}
+
 const routes = {
   '/api/onboarding': {
     GET: async () => {
@@ -5613,6 +5714,16 @@ const routes = {
   '/api/ai/settings/:provider': {
     DELETE: async (_, params) => {
       return { success: true, data: clearAiSettings(params.provider) }
+    }
+  },
+  '/api/system/reset': {
+    POST: async () => {
+      try {
+        resetSystem()
+        return { success: true, data: { message: '系统已重置为初始状态' } }
+      } catch (error) {
+        return { success: false, error: `重置失败：${error.message}` }
+      }
     }
   },
   '/api/resume/profile': {

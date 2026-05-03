@@ -57,7 +57,8 @@ export const aiAPI = {
   getProviders: () => unwrap(axios.get(`${API_BASE}/ai/providers`)),
   getSettings: () => unwrap(axios.get(`${API_BASE}/ai/settings`)),
   saveSettings: (data) => unwrap(axios.post(`${API_BASE}/ai/settings`, data)),
-  clearSettings: (provider) => unwrap(axios.delete(`${API_BASE}/ai/settings/${provider}`))
+  clearSettings: (provider) => unwrap(axios.delete(`${API_BASE}/ai/settings/${provider}`)),
+  resetSystem: () => unwrap(axios.post(`${API_BASE}/system/reset`))
 }
 
 export const resumeAPI = {

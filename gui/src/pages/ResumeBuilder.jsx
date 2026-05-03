@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { FileText, FileImage, CheckCircle, FloppyDisk, Upload, DotsSixVertical, Plus, PencilSimple, PencilSimpleLine, Eye, EyeSlash, X, CaretDown, CaretUp, User, Briefcase, GraduationCap, FolderOpen, ArrowClockwise, Warning, FileArrowUp, Trash, Sparkle } from '@phosphor-icons/react'
+import * as pdfjsLib from 'pdfjs-dist'
 import { aiAPI, jobsAPI, resumeAPI } from '../api'
 import { showToast } from '../utils/toast'
 import { PageTransition, LiquidSectionHeader, LiquidCard, MagneticButton, ScrollReveal } from '../components/LiquidMotion'
 import '../styles/liquid-motion.css'
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`
 
 /* ── 子组件 ── */
 
@@ -1012,6 +1015,8 @@ export default function ResumeBuilder({ onToast }) {
   const [bulkImportOpen, setBulkImportOpen] = useState(false)
   const [bulkImportText, setBulkImportText] = useState('')
   const [isBulkImporting, setIsBulkImporting] = useState(false)
+  const [isParsingPdf, setIsParsingPdf] = useState(false)
+  const pdfInputRef = useRef(null)
 
   const triggerBulkImport = async () => {
     if (!bulkImportText.trim()) { showToast(onToast, '请先粘贴要导入的资料内容', 'error'); return }
@@ -1029,6 +1034,39 @@ export default function ResumeBuilder({ onToast }) {
     } catch (error) {
       showToast(onToast, error?.response?.data?.error || error?.message || '导入失败', 'error')
     } finally { setIsBulkImporting(false) }
+  }
+
+  const handlePdfSelect = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.type !== 'application/pdf') {
+      showToast(onToast, '请选择 PDF 文件', 'error')
+      return
+    }
+    setIsParsingPdf(true)
+    try {
+      const arrayBuffer = await file.arrayBuffer()
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+      const textParts = []
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i)
+        const content = await page.getTextContent()
+        const pageText = content.items.map(item => item.str).join(' ')
+        textParts.push(pageText)
+      }
+      const extracted = textParts.join('\n').trim()
+      if (!extracted) {
+        showToast(onToast, '该 PDF 未包含可提取的文字内容', 'error')
+        return
+      }
+      setBulkImportText(extracted)
+      showToast(onToast, `已从 PDF 提取 ${pdf.numPages} 页文字，请确认后点击"开始导入"`, 'success')
+    } catch (err) {
+      showToast(onToast, `PDF 解析失败：${err.message}`, 'error')
+    } finally {
+      setIsParsingPdf(false)
+      if (pdfInputRef.current) pdfInputRef.current.value = ''
+    }
   }
 
   const basicPhotoSrc = resolvePhotoSrc(profile, photoPreview)
@@ -1498,7 +1536,7 @@ export default function ResumeBuilder({ onToast }) {
             </div>
             <div>
               <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>AI 导入资料</h3>
-              <p style={{ margin: '2px 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>粘贴旧简历或项目描述，AI 自动提取结构化数据并与已有内容合并。不覆盖已有数据。</p>
+              <p style={{ margin: '2px 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>粘贴旧简历或上传 PDF，AI 自动提取结构化数据并与已有内容合并。不覆盖已有数据。</p>
             </div>
           </div>
           <textarea
@@ -1507,8 +1545,30 @@ export default function ResumeBuilder({ onToast }) {
             placeholder="在此粘贴你的资料...&#10;&#10;可以是旧简历、项目描述、技能列表、获奖记录、工作经历等任意文本。&#10;AI 会自动识别内容类型并提取结构化数据。"
             rows={8}
             className="form-control"
-            style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', fontSize: '14px', lineHeight: '1.7', marginBottom: '12px' }}
+            style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', fontSize: '14px', lineHeight: '1.7', marginBottom: '8px' }}
           />
+          <div style={{ marginBottom: '12px' }}>
+            <input ref={pdfInputRef} type="file" accept="application/pdf" style={{ display: 'none' }} onChange={handlePdfSelect} />
+            <button
+              type="button"
+              onClick={() => pdfInputRef.current?.click()}
+              disabled={isParsingPdf}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                padding: '6px 14px', fontSize: '13px', borderRadius: '8px',
+                border: '1px dashed var(--border-color)', background: 'var(--bg-secondary)',
+                color: 'var(--text-secondary)', cursor: isParsingPdf ? 'wait' : 'pointer',
+                transition: 'all 0.2s'
+              }}
+              onMouseOver={e => { e.currentTarget.style.borderColor = 'var(--primary-color)'; e.currentTarget.style.color = 'var(--primary-color)' }}
+              onMouseOut={e => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.color = 'var(--text-secondary)' }}
+            >
+              {isParsingPdf
+                ? <><div className="liquid-spinner" style={{ width: '14px', height: '14px', borderWidth: '2px' }} />解析中...</>
+                : <><FileArrowUp size={16} />上传 PDF 自动提取文字</>
+              }
+            </button>
+          </div>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <select value={selectedProvider} onChange={e => setSelectedProvider(e.target.value)} className="form-control" style={{ width: '200px', fontSize: '13px' }}>
@@ -1781,7 +1841,7 @@ export default function ResumeBuilder({ onToast }) {
         <LiquidCard>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: '200px' }}>
-              <select value={selectedJob || ''} onChange={(e) => setSelectedJob(e.target.value ? Number(e.target.value) : null)} className="form-control">
+              <select value={selectedJob || ''} onChange={(e) => setSelectedJob(e.target.value || '')} className="form-control">
                 <option value="">选择目标岗位（可选）</option>
                 {jobs.map(job => <option key={job.id} value={job.id}>{job.company} — {job.title}</option>)}
               </select>
