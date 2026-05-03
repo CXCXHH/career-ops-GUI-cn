@@ -4,7 +4,6 @@ import { Link } from 'react-router-dom'
 import { healthAPI, jobsAPI, trackerAPI } from '../api'
 import { showToast } from '../utils/toast'
 import { FluidCanvas, LiquidCard, PageTransition, LiquidSectionHeader, MagneticButton, ScrollReveal } from '../components/LiquidMotion'
-import '../styles/liquid-motion.css'
 
 export default function Dashboard({ onToast }) {
   const [healthStatus, setHealthStatus] = useState(null)
@@ -155,7 +154,7 @@ export default function Dashboard({ onToast }) {
                       <td>{value.message}</td>
                       <td>
                         {(key === 'cv' || key === 'portals' || key === 'profile') && value.status !== 'pass' ? (
-                          <Link to="/onboarding" className="btn btn-secondary btn-sm">去配置</Link>
+                          <Link to="/resume" className="btn btn-secondary btn-sm">去配置</Link>
                         ) : '-'}
                       </td>
                     </tr>

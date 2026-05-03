@@ -3,7 +3,6 @@ import { Gear } from '@phosphor-icons/react'
 import { aiAPI } from '../api'
 import { showToast } from '../utils/toast'
 import { PageTransition, LiquidSectionHeader, LiquidCard, MagneticButton } from '../components/LiquidMotion'
-import '../styles/liquid-motion.css'
 
 export default function Settings({ onToast }) {
   const [aiSettings, setAiSettings] = useState(null)
@@ -108,12 +107,12 @@ export default function Settings({ onToast }) {
         <div className="card-header">
           <div>
             <div className="card-title">AI API 评分配置</div>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '4px' }}>
+            <p className="text-13 text-secondary mt-4">
               API Key 会保存到本机项目 .env 文件。留空 Key 时只更新模型和地址，不会清空已有 Key；如需删除，请使用清除按钮。
             </p>
           </div>
           <MagneticButton variant="primary" className="btn-sm" onClick={saveAiSettings} disabled={isSavingAi}>
-            <Gear style={{ width: '14px', height: '14px', marginRight: '6px' }} />
+            <Gear style={{ width: 14, height: 14, marginRight: 6 }} />
             {isSavingAi ? '保存中...' : '保存 AI 配置'}
           </MagneticButton>
         </div>
@@ -122,7 +121,7 @@ export default function Settings({ onToast }) {
           <div className="provider-card">
             <div className="provider-title">
               <strong>DeepSeek</strong>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div className="flex items-center gap-8">
                 <span className={`status-badge ${aiSettings?.deepseek?.configured ? 'status-active' : 'status-unconfirmed'}`}>
                   {aiSettings?.deepseek?.configured ? `已配置 ${aiSettings.deepseek.apiKeyMasked}` : '未配置'}
                 </span>
@@ -168,7 +167,7 @@ export default function Settings({ onToast }) {
           <div className="provider-card">
             <div className="provider-title">
               <strong>豆包 / 火山方舟</strong>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div className="flex items-center gap-8">
                 <span className={`status-badge ${aiSettings?.doubao?.configured ? 'status-active' : 'status-unconfirmed'}`}>
                   {aiSettings?.doubao?.configured ? `已配置 ${aiSettings.doubao.apiKeyMasked}` : '未配置'}
                 </span>

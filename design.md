@@ -166,6 +166,46 @@ h1, h2, h3, h4 {
 
 ---
 
+## CSS 架构
+
+### 文件结构
+
+所有样式集中在两个文件中，不再使用分散的 CSS 文件：
+
+- `gui/src/styles/variables.css` — 设计变量（颜色、字体、阴影、间距）
+- `gui/src/styles/index.css` — 全部组件样式 + 工具类
+
+### 工具类系统
+
+提供 Tailwind 风格的工具类，覆盖常用布局和样式模式，减少内联 `style={{}}` 的使用：
+
+- **布局：** `.flex`、`.flex-col`、`.flex-center`、`.flex-between`、`.flex-wrap`、`.items-start`、`.items-center`、`.gap-4`~`.gap-32`
+- **间距：** `.mt-4`~`.mt-24`、`.mb-4`~`.mb-24`、`.p-8`~`.p-24`、`.px-16`、`.py-8`
+- **文字：** `.text-11`~`.text-20`、`.font-500`~`.font-700`、`.text-primary`、`.text-secondary`、`.text-muted`
+- **Grid：** `.grid-auto-140`、`.grid-auto-160`、`.grid-auto-200`、`.grid-auto-300`
+- **组件：** `.form-label`、`.form-error`、`.section-divider`、`.diff-box`、`.preview-container`
+
+### 页面专用类
+
+面试准备页面（`InterviewPrep.jsx`）使用 `ip-` 前缀的专用类，替代硬编码的十六进制颜色：
+
+- `.ip-section-title` — 统一的区块标题样式（使用 `var(--primary-color)`）
+- `.ip-answer-box` — 回答内容框（使用 `var(--bg-secondary)`）
+- `.ip-strength-card` — 优势卡片（使用 `var(--success-tint)`）
+- `.ip-warning-box` — 警告提示框（使用 `var(--warning-tint)`）
+- `.ip-number-badge` — 编号圆形徽章（使用 `var(--primary-color)`）
+
+### 动效策略
+
+动效最小化、统一化：
+
+- **framer-motion：** `LiquidCard`（淡入 + 微悬浮）、`MagneticButton`（弹性 hover）
+- **CSS transition：** 按钮、表单、卡片 hover 使用 `transition: all 0.2s ease`
+- **CSS keyframes：** 仅保留 `@keyframes spin`（loading）和 `@keyframes slideIn`（toast）
+- 不为新页面引入额外动效组件
+
+---
+
 ## 与 editorial 设计的差异
 
 本项目参考了 editorial web design 的暖色美学，但做了以下取舍：

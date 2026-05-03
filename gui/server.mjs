@@ -5,6 +5,9 @@ import { execFile } from 'child_process'
 import yaml from 'js-yaml'
 import { chromium } from 'playwright'
 import { classifyLiveness } from '../scripts/jobs/liveness-core.mjs'
+import { PROFILE_SCHEMA } from './server/schema.js'
+import { mergeData, mergeField } from './server/merge.js'
+import { SYSTEM_PROMPTS, buildBulkImportPrompt, buildAutoFillPrompt, buildEvaluatePrompt, buildInterviewPrompt, buildOptimizeJdPrompt } from './server/prompts.js'
 import https from 'https'
 import http from 'http'
 
@@ -1964,23 +1967,23 @@ function deleteResumePhoto() {
 }
 
 function saveResumeModuleData(moduleId, payload = {}) {
-  if (!BUILTIN_RESUME_DATA_MODULES.has(moduleId)) {
+  // Schema-driven: look up the module mapping, validate, and save
+  const MODULE_TO_FIELD = {
+    education: { key: 'education', schema: PROFILE_SCHEMA.education },
+    experience: { key: 'experience', schema: PROFILE_SCHEMA.experience },
+    projects: { key: 'projects', schema: PROFILE_SCHEMA.projects },
+  }
+
+  const mapping = MODULE_TO_FIELD[moduleId]
+  if (!mapping) {
     throw new Error('Unsupported resume data module')
   }
 
-  const current = getResumeProfile()
-  const next = { ...current }
+  const data = payload[mapping.key]
+  if (!Array.isArray(data)) throw new Error(`${mapping.key} must be an array`)
 
-  if (moduleId === 'education') {
-    if (!Array.isArray(payload.education)) throw new Error('education must be an array')
-    next.education = payload.education
-  } else if (moduleId === 'experience') {
-    if (!Array.isArray(payload.experience)) throw new Error('experience must be an array')
-    next.experience = payload.experience
-  } else if (moduleId === 'projects') {
-    if (!Array.isArray(payload.projects)) throw new Error('projects must be an array')
-    next.projects = payload.projects
-  }
+  const current = getResumeProfile()
+  const next = { ...current, [mapping.key]: data }
 
   writeFileSync(RESUME_PROFILE_FILE, JSON.stringify(next, null, 2), 'utf-8')
   return next
@@ -2693,10 +2696,11 @@ async function adaptExistingProjectsWithAi(job, profile, projects, provider = 'd
 
 硬性规则：
 1. 不得改变项目本质，不得把没做过的内容写成做过。
-2. 可以调整项目标题、技术栈排序和 bullet 表达，使其更贴近岗位要求。
+2. 只能做两件事：(a) 用岗位 JD 中的关键词微调描述措辞；(b) 调整技术栈排序使其更贴近岗位。
 3. 每个项目只能输出 3 条 bullet，每条包含动作、技术和验证方式/结果。
 4. 如果项目与岗位严重不匹配，只保留可迁移能力，不要强行改成目标岗位项目。
 5. 不得编造论文、竞赛、奖项、证书、真实公司经历、生产上线、客户、营收、专利、量产数据。
+6. 不得添加候选人未提及的技术、工具或成果。改写后的描述必须能从原始描述中推导出来。
 
 目标岗位：${job.company || ''} - ${job.title || ''}
 岗位领域：${context.inferred.domain.label} (${context.inferred.domain.primary})
@@ -2791,76 +2795,10 @@ async function buildTailoredResume(job, profile, provider) {
 
   const profileExperience = Array.isArray(profile.experience) ? profile.experience : []
   const projectPlan = context.inferred.project_plan
-  const needProjectCount = projectPlan.new_projects.length
-
-  if (needProjectCount > 0) {
-    try {
-      // Calculate the latest end date across all existing projects
-      let latestEndYear = 0, latestEndMonth = 0
-      for (const p of projects) {
-        const endPart = p.time.replace(/.*至\s*/, '').replace('至今', '').trim()
-        const m = endPart.match(/(\d{4})-(\d{2})/)
-        if (m) {
-          const y = parseInt(m[1]), mo = parseInt(m[2])
-          if (y * 12 + mo > latestEndYear * 12 + latestEndMonth) {
-            latestEndYear = y; latestEndMonth = mo
-          }
-        }
-      }
-      const lastProjectEndDate = latestEndYear > 0 ? `${latestEndYear}-${String(latestEndMonth).padStart(2, '0')}` : ''
-      const generatedProjects = await generateProjectsWithAi(job, profile, profileProjects, needProjectCount, lastProjectEndDate, resumeProvider, context)
-      const validation = validateGeneratedProjects(generatedProjects, context)
-      const aiProjects = validation.projects
-      if (validation.warnings.length) console.warn('AI project validation warnings:', validation.warnings.join('; '))
-      projects.push(...aiProjects)
-
-      // 回写 AI 生成的项目到 resume-profile.json，标记 ai_generated
-      try {
-        const aiProjectsForProfile = aiProjects.map(ap => ({
-          name: ap.title.replace(/\s*\|\s*个人项目$/, '').trim(),
-          role: ap.role || '个人项目',
-          start_date: (ap.time.match(/^(\d{4}-\d{2})/) || [])[1] || '',
-          end_date: ap.time.includes('至今') ? '' : (ap.time.match(/至\s*(\d{4}-\d{2})/) || [])[1] || '',
-          tech_stack: ap.stack || '',
-          description: (ap.bullets || []).join('；\n') + '；',
-          ai_generated: true,
-          ai_target_job: `${job.company || ''} - ${job.title || ''}`,
-          ai_generation_reason: (ap.metadata?.business_scenario || projectPlan.new_projects[0]?.business_scenario || '补足岗位项目证据'),
-          ai_domain: ap.metadata?.domain || context.inferred.domain.primary,
-          ai_project_type: ap.metadata?.project_type || 'new_portfolio',
-          ai_truth_level: ap.metadata?.truth_level || 'gap_bridging',
-          ai_source_project_id: '',
-          ai_risk_notes: ap.metadata?.risk_notes || [],
-          ai_generated_at: new Date().toISOString()
-        }))
-        // 追加而非替换，避免覆盖用户自填项目
-        const currentProfile = getResumeProfile()
-        const existingNames = new Set((currentProfile.projects || []).map(p => p.name))
-        const newAiProjects = aiProjectsForProfile.filter(p => !existingNames.has(p.name))
-        if (newAiProjects.length > 0) {
-          currentProfile.projects = [...(currentProfile.projects || []), ...newAiProjects]
-          writeFileSync(RESUME_PROFILE_FILE, JSON.stringify(currentProfile, null, 2), 'utf-8')
-        }
-      } catch (writeErr) {
-        console.error('Failed to write AI projects back to profile:', writeErr.message)
-      }
-
-      // Re-sort by time after adding AI projects
-      projects.sort((a, b) => {
-        const parseTime = (t) => {
-          const m = t.match(/(\d{4})-(\d{2})/)
-          return m ? parseInt(m[1]) * 12 + parseInt(m[2]) : 0
-        }
-        return parseTime(a.time) - parseTime(b.time)
-      })
-    } catch (e) {
-      console.error('AI project generation failed:', e.message)
-    }
-  }
 
   const gaps = [
     ...(job.gaps || []),
-    ...(projects.length === 0 ? ['项目经历不足：请补充真实项目，或配置 AI 后重新生成岗位化作品集项目。'] : []),
+    ...(projects.length === 0 ? ['项目经历不足：请补充真实项目后重新定制。'] : []),
     ...(projectPlan.weak_job_description ? ['岗位描述不足：当前基于搜索页/有限信息保守生成，建议补充完整 JD 后重新定制。'] : [])
   ].slice(0, 3)
 
@@ -2891,18 +2829,46 @@ async function buildTailoredResume(job, profile, provider) {
     bullets: (e.description || '').split('\n').filter(l => l.trim())
   }))
 
-  return {
-    profile,
-    company,
-    role,
-    summary,
-    skills,
-    projects,
-    gaps,
-    modules,
-    education,
-    experience
+  // ── Build diff: compare original profile vs tailored resume ──
+  const originalSkills = parseKeywordList(profile.skills)
+  const tailoredSkillNames = Array.isArray(skills)
+    ? skills.flatMap(g => (g.items || []).map(i => typeof i === 'string' ? i : i.name || '')).filter(Boolean)
+    : parseKeywordList(skills)
+  const skillsChanged = JSON.stringify(originalSkills.sort()) !== JSON.stringify(tailoredSkillNames.sort())
+
+  const originalProjectNames = (context.candidate.projects || []).map(p => getProjectDisplayName(p))
+  const tailoredProjectNames = projects.map(p => p.title)
+  const filteredProjects = originalProjectNames.filter(name => !tailoredProjectNames.includes(name))
+
+  const originalSummary = String(profile.summary || '').trim()
+  const summaryChanged = originalSummary !== String(summary || '').trim()
+
+  const diff = {
+    summary: { original: originalSummary, tailored: String(summary || '').trim(), changed: summaryChanged },
+    skills: {
+      original: originalSkills,
+      tailored: tailoredSkillNames,
+      changed: skillsChanged,
+      note: skillsChanged ? '已根据岗位需求调整技能排序和筛选' : '技能未变化'
+    },
+    projects: projects.map(p => {
+      const orig = (context.candidate.projects || []).find(op => getProjectDisplayName(op) === p.title)
+      const origBullets = orig ? (orig.description || '').split(/[；;\n]/).map(l => l.trim()).filter(Boolean) : []
+      const changed = JSON.stringify(origBullets) !== JSON.stringify(p.bullets)
+      return {
+        name: p.title,
+        action: changed ? 'rephrased' : 'kept',
+        original_bullets: origBullets,
+        tailored_bullets: p.bullets,
+        note: changed ? '描述已根据岗位关键词微调' : '未修改'
+      }
+    }),
+    filtered_projects: filteredProjects,
+    note: filteredProjects.length > 0 ? `筛选掉 ${filteredProjects.length} 个与岗位关联度较低的项目` : '所有项目均已保留'
   }
+
+  const resume = { profile, company, role, summary, skills, projects, gaps, modules, education, experience }
+  return { resume, diff }
 }
 
 function formatDateShort(date) {
@@ -2941,29 +2907,30 @@ AI评分简历策略建议：
 ${resumeStrategy || '无'}`
     : ''
 
-  const prompt = `你是一位严谨的中文简历优化专家。请根据【目标岗位描述（JD）】和【候选人材料】，提取最重要的核心技能标签，并将其归为3-4类。分类标题必须根据岗位领域动态生成。
+  const prompt = `你是一位严谨的中文简历优化专家。请根据【目标岗位描述（JD）】和【候选人材料】，从候选人**已有的技能和经历**中提取最重要的核心技能标签，并将其归为3-4类。分类标题必须根据岗位领域动态生成。
 
 必须只输出 JSON 对象，不要 Markdown，不要代码块。JSON schema:
 {
-  "skill_groups": [
+  “skill_groups”: [
     {
-      "group": "分类标题",
-      "items": [
-        {"name": "技能标签", "evidence": "证据来源", "confidence": "high|medium|low"}
+      “group”: “分类标题”,
+      “items”: [
+        {“name”: “技能标签”, “evidence”: “证据来源”, “confidence”: “high|medium|low”}
       ]
     }
   ],
-  "do_not_claim": ["不能声称的能力"]
+  “do_not_claim”: [“不能声称的能力”]
 }
 
-要求：
-1. 每个技能标签要简洁（10-20字），并列技术用中文顿号"、"分隔，不要用斜杠"/"
-2. 技能必须与岗位强相关，优先突出岗位JD中明确要求的技术
-3. 必须标注 evidence 和 confidence；无证据的能力只能作为 low confidence，不得写成“精通”
-4. 如果用户自填了核心能力，确保覆盖其中的关键技能
-5. 仔细参考AI评分结果中的"差距"和"简历策略"，但不得把 gap 写成已掌握
-6. 每个分类下2-4个标签，总计不超过12个标签
-7. 不得输出"相关技术栈1"、"开发工具链"这类模板词
+【硬性红线——违反即视为错误】：
+1. 每个技能标签必须有明确的证据来源（用户自填技能、项目经历、工作经历）。没有证据的技能不得出现在输出中。
+2. 禁止根据 JD 推测或补充候选人未提及的技能。JD 仅用于”排序优先级”——优先展示与 JD 重合的已有技能，而非补充新技能。
+3. 如果候选人技能与 JD 要求差距较大，只能如实展示已有技能，不得”帮”候选人补全。
+4. 不得把 AI 评分中的 gaps（差距项）写成候选人已掌握的技能。
+5. 如果用户自填了核心能力，必须确保覆盖其中的关键技能。
+6. 每个技能标签要简洁（10-20字），并列技术用中文顿号”、”分隔，不要用斜杠”/”
+7. 每个分类下2-4个标签，总计不超过12个标签
+8. 不得输出”相关技术栈1”、”开发工具链”这类模板词
 
 岗位：${company} - ${role}
 岗位领域：${domain.label} (${domain.primary})，识别信号：${domain.signals.join('、') || '无'}
@@ -6182,8 +6149,8 @@ const routes = {
       }
 
       const profile = getResumeProfile()
-      const resume = await buildTailoredResume(job, profile, provider)
-      return { success: true, data: resume }
+      const result = await buildTailoredResume(job, profile, provider)
+      return { success: true, data: result }
     }
   },
   '/api/jobs/:id/resume/pdf': {
@@ -6191,7 +6158,7 @@ const routes = {
       const jobs = readJsonl(JOBS_FILE)
       const job = jobs.find(j => j.id === params.id)
       if (!job) return { success: false, error: 'Job not found' }
-      
+
       const date = new Date().toISOString().split('T')[0]
       const profile = getResumeProfile()
       const stem = resumeFileStem(job, profile, date)
@@ -6202,10 +6169,38 @@ const routes = {
       const fileName = artifactNames.pdf
       const htmlName = artifactNames.html
       const htmlPath = `${PROJECT_ROOT}/tmp/${htmlName}`
-      const resume = await buildTailoredResume(job, profile, body.provider)
+      const result = await buildTailoredResume(job, profile, body.provider)
+      const resume = result.resume
       writeFileSync(htmlPath, buildResumeHtml(resume), 'utf-8')
       await execFileAsync('node', ['scripts/cv/generate-pdf.mjs', `tmp/${htmlName}`, `output/${fileName}`, '--format=a4'], { cwd: PROJECT_ROOT })
-      return { success: true, data: { fileName, path: `output/${fileName}` } }
+
+      // Save tailored version JSON alongside the PDF
+      const versionsDir = `${PROJECT_ROOT}/data/job-radar/resume-versions`
+      if (!existsSync(versionsDir)) mkdirSync(versionsDir, { recursive: true })
+      const versionId = `${stem}-${Date.now()}`
+      const versionData = {
+        id: versionId,
+        job_id: job.id || '',
+        company: job.company || '',
+        title: job.title || '',
+        provider: body.provider || '',
+        created_at: new Date().toISOString(),
+        pdf_file: fileName,
+        resume: {
+          profile: { full_name: profile.full_name, target_role: profile.target_role, phone: profile.phone, email: profile.email, github: profile.github, location: profile.location, wechat: profile.wechat, gender: profile.gender, age: profile.age, graduation: profile.graduation },
+          summary: resume.summary,
+          skills: resume.skills,
+          education: resume.education,
+          experience: resume.experience,
+          projects: resume.projects,
+          gaps: resume.gaps,
+          modules: resume.modules,
+        },
+        diff: result.diff
+      }
+      writeFileSync(`${versionsDir}/${versionId}.json`, JSON.stringify(versionData, null, 2), 'utf-8')
+
+      return { success: true, data: { fileName, path: `output/${fileName}`, version_id: versionId } }
     }
   },
   '/api/jobs/:id/resume/files': {
@@ -6243,6 +6238,34 @@ const routes = {
       return { success: true, data: listGeneratedResumeFiles() }
     }
   },
+  '/api/resume/versions': {
+    GET: async () => {
+      const dir = `${PROJECT_ROOT}/data/job-radar/resume-versions`
+      if (!existsSync(dir)) return { success: true, data: [] }
+      const files = readdirSync(dir).filter(f => f.endsWith('.json')).sort().reverse()
+      const versions = files.map(f => {
+        try {
+          const data = JSON.parse(readFileSync(`${dir}/${f}`, 'utf-8'))
+          return { id: data.id, company: data.company, title: data.title, created_at: data.created_at, pdf_file: data.pdf_file }
+        } catch { return null }
+      }).filter(Boolean)
+      return { success: true, data: versions }
+    }
+  },
+  '/api/resume/versions/:id': {
+    GET: async (_, params) => {
+      const filePath = `${PROJECT_ROOT}/data/job-radar/resume-versions/${params.id}.json`
+      if (!existsSync(filePath)) return { success: false, error: '版本不存在' }
+      const data = JSON.parse(readFileSync(filePath, 'utf-8'))
+      return { success: true, data }
+    },
+    DELETE: async (_, params) => {
+      const filePath = `${PROJECT_ROOT}/data/job-radar/resume-versions/${params.id}.json`
+      if (!existsSync(filePath)) return { success: false, error: '版本不存在' }
+      unlinkSync(filePath)
+      return { success: true }
+    }
+  },
   '/api/resume/photo': {
     DELETE: async () => {
       const profile = deleteResumePhoto()
@@ -6256,117 +6279,30 @@ const routes = {
         return { success: false, error: '请输入要导入的资料内容' }
       }
       const profile = getResumeProfile()
-      const existingAwards = (profile.modules || []).find(m => m.id === 'awards')?.content || ''
 
-      const prompt = `你是一个简历数据提取与合并专家。请根据【用户新输入的资料】，提取结构化简历数据。
-
-## 合并规则（极其重要）
-1. 已有数据是"底稿"，用户新输入是"补充源"
-2. 基本信息（姓名、性别、年龄等）：只填充当前为空的字段，不覆盖已有值
-3. 教育/经历/项目数组：逐条比对——如果新条目与已有条目描述的是同一段经历（同学校/同公司/同项目名），则合并补充缺失字段；如果是全新条目，则追加
-4. 技能：取已有技能和新技能的并集，去重
-5. 获奖荣誉：追加新获奖，不删除已有获奖
-6. summary（一句话定位）：如果已有则保留，不覆盖
-7. description 字段中的多条内容必须用中文分号"；"分隔，不要用句号
-
-## 已有数据
-${JSON.stringify({
-  full_name: profile.full_name || '',
-  gender: profile.gender || '',
-  age: profile.age || '',
-  phone: profile.phone || '',
-  email: profile.email || '',
-  wechat: profile.wechat || '',
-  github: profile.github || '',
-  summary: profile.summary || '',
-  skills: profile.skills || '',
-  education: profile.education || [],
-  experience: profile.experience || [],
-  projects: profile.projects || []
-}, null, 2)}
-
-已有获奖荣誉：${existingAwards || '无'}
-
-## 用户新输入的资料
-${userInput.trim()}
-
-## 要求
-返回一个 JSON 对象，包含以下字段（即使某字段无变化也要返回原值）：
-{
-  "full_name": "",
-  "gender": "",
-  "age": "",
-  "phone": "",
-  "email": "",
-  "wechat": "",
-  "github": "",
-  "summary": "",
-  "skills": "技能1, 技能2, 技能3",
-  "education": [{"school":"","degree":"","major":"","start_date":"YYYY-MM","end_date":"YYYY-MM","gpa":"","description":""}],
-  "experience": [{"company":"","position":"","start_date":"YYYY-MM","end_date":"YYYY-MM","description":"用分号分隔的短句","role":""}],
-  "projects": [{"name":"","role":"","start_date":"YYYY-MM","end_date":"YYYY-MM","description":"用分号分隔的短句","tech_stack":""}],
-  "awards": "获奖1；获奖2；获奖3"
-}
-
-只返回 JSON，不要任何其他文字。`
+      const prompt = buildBulkImportPrompt(userInput, profile)
 
       try {
         const response = await callChatCompletions(provider, prompt, {
-          systemPrompt: '你是严格输出 JSON 的简历数据合并专家。只返回JSON对象，不要任何其他文字。不要用markdown代码块包裹。',
+          systemPrompt: SYSTEM_PROMPTS.resume,
           temperature: 0.1,
           maxTokens: 6000
         })
         const parsed = extractJsonObject(response.content)
 
-        // 智能合并：基本信息只填空
-        const merged = { ...profile }
-        for (const key of ['full_name', 'gender', 'age', 'phone', 'email', 'wechat', 'github']) {
-          if (!merged[key] && parsed[key]) merged[key] = parsed[key]
-        }
-        if (!merged.summary && parsed.summary) merged.summary = parsed.summary
-        if (!merged.skills && parsed.skills) merged.skills = parsed.skills
-        // 技能合并：如果都有值，取并集
-        if (merged.skills && parsed.skills) {
-          const oldSet = new Set(merged.skills.split(/[,，、]/).map(s => s.trim()).filter(Boolean))
-          for (const s of parsed.skills.split(/[,，、]/).map(s => s.trim()).filter(Boolean)) {
-            oldSet.add(s)
-          }
-          merged.skills = Array.from(oldSet).join(', ')
-        }
+        // Merge via unified function
+        const merged = mergeData(profile, parsed, PROFILE_SCHEMA)
 
-        // 数组合并：按名称去重追加
-        const mergeArray = (existing, incoming, nameKey) => {
-          if (!Array.isArray(incoming) || incoming.length === 0) return existing || []
-          const result = [...(existing || [])]
-          for (const newItem of incoming) {
-            const newName = (newItem[nameKey] || '').trim()
-            if (!newName) continue
-            const idx = result.findIndex(e => (e[nameKey] || '').trim() === newName)
-            if (idx >= 0) {
-              // 同名条目：合并补充空字段
-              for (const k of Object.keys(newItem)) {
-                if (!result[idx][k] && newItem[k]) result[idx][k] = newItem[k]
-              }
-            } else {
-              result.push(newItem)
-            }
-          }
-          return result
-        }
-
-        merged.education = mergeArray(profile.education, parsed.education, 'school')
-        merged.experience = mergeArray(profile.experience, parsed.experience, 'company')
-        merged.projects = mergeArray(profile.projects, parsed.projects, 'name')
-
-        // 获奖合并
+        // Awards handled separately (custom module)
         const newAwards = parsed.awards || ''
         if (newAwards) {
-          const existingList = existingAwards.split('；').map(s => s.trim()).filter(Boolean)
-          const newList = newAwards.split('；').map(s => s.trim()).filter(Boolean)
+          const existingAwards = (profile.modules || []).find(m => m.id === 'awards')?.content || ''
+          const existingList = existingAwards.split(/[；;]/).map(s => s.trim()).filter(Boolean)
+          const newList = newAwards.split(/[；;]/).map(s => s.trim()).filter(Boolean)
           const awardSet = new Set(existingList)
           for (const a of newList) awardSet.add(a)
           const mergedAwards = Array.from(awardSet).join('；')
-          const modules = normalizeResumeModules(profile.modules)
+          const modules = normalizeResumeModules(merged.modules)
           const awardsIdx = modules.findIndex(m => m.id === 'awards')
           if (awardsIdx >= 0) {
             modules[awardsIdx].content = mergedAwards

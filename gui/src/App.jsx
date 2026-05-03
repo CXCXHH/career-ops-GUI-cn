@@ -1,25 +1,16 @@
-import { useState, useEffect, Suspense, lazy } from 'react'
-import { Routes, Route, useLocation } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Routes, Route } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import Toast from './components/Toast'
 import Dashboard from './pages/Dashboard'
 import Companies from './pages/Companies'
-import Discovery from './pages/Discovery'
 import Jobs from './pages/Jobs'
 import ResumeBuilder from './pages/ResumeBuilder'
 import Tracker from './pages/Tracker'
 import InterviewPrep from './pages/InterviewPrep'
-import Followups from './pages/Followups'
-import Candidates from './pages/Candidates'
 import Settings from './pages/Settings'
-import Onboarding from './pages/Onboarding'
-import './styles/liquid-hero.css'
-
-// Lazy load LiquidMetalHero to avoid SSR issues with Paper.js
-const LiquidMetalHero = lazy(() => import('./components/LiquidMetalHero'))
 
 export default function App() {
-  const location = useLocation()
   const [toast, setToast] = useState(null)
   const [isReady, setIsReady] = useState(false)
 
@@ -39,29 +30,18 @@ export default function App() {
     return <div>Loading...</div>
   }
 
-  const isHomePage = location.pathname === '/'
-
   return (
     <>
       <Sidebar />
       <main className="main-content">
-        {isHomePage && (
-          <Suspense fallback={<div style={{ minHeight: '100dvh' }} />}>
-            <LiquidMetalHero />
-          </Suspense>
-        )}
         <Routes>
           <Route path="/" element={<Dashboard onToast={showToast} />} />
           <Route path="/companies" element={<Companies onToast={showToast} />} />
-          <Route path="/discovery" element={<Discovery onToast={showToast} />} />
           <Route path="/jobs" element={<Jobs onToast={showToast} />} />
           <Route path="/resume" element={<ResumeBuilder onToast={showToast} />} />
           <Route path="/tracker" element={<Tracker onToast={showToast} />} />
           <Route path="/interview" element={<InterviewPrep onToast={showToast} />} />
           <Route path="/interview-prep" element={<InterviewPrep onToast={showToast} />} />
-          <Route path="/followups" element={<Followups onToast={showToast} />} />
-          <Route path="/candidates" element={<Candidates onToast={showToast} />} />
-          <Route path="/onboarding" element={<Onboarding onToast={showToast} />} />
           <Route path="/settings" element={<Settings onToast={showToast} />} />
         </Routes>
       </main>
